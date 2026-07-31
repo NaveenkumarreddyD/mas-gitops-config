@@ -1,0 +1,5 @@
+merge-key: "doc4/doc4/docapp"
+
+ibm_mas_workspaces:
+  - mas_workspace_id: docwks
+    mas_workspace_name: "docwks"

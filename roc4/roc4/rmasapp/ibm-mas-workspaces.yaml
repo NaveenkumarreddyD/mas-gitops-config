@@ -1,0 +1,5 @@
+merge-key: "roc4/roc4/rmasapp"
+
+ibm_mas_workspaces:
+  - mas_workspace_id: rmasappwks
+    mas_workspace_name: "rmasappwks"

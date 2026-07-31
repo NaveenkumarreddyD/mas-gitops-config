@@ -1,0 +1,6 @@
+merge-key: "nroc4/nroc4"
+
+ibm_operator_catalog:
+  mas_catalog_version: v9-250925-amd64
+  mas_catalog_image: icr.io/cpopen/ibm-maximo-operator-catalog
+  ibm_entitlement_key: "<path:secret/data/nroc4/nroc4/entitlement#image_pull_secret_b64>"

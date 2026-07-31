@@ -1,0 +1,5 @@
+merge-key: "nroc4/nroc4/nmasapp"
+
+ibm_mas_workspaces:
+  - mas_workspace_id: nmasappwks
+    mas_workspace_name: "nmasappwks"

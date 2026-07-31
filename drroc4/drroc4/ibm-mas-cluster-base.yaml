@@ -1,0 +1,24 @@
+merge-key: "drroc4/drroc4"
+
+account:
+  id: drroc4
+
+region:
+  id: lac1
+
+cluster:
+  id: drroc4
+  url: https://kubernetes.default.svc
+  nonshared: ""
+
+# Required by IBM 8.4.0 root templates (they reference .Values.sm.* unconditionally;
+# a missing block nil-pointers the whole cluster/instance root render). Empty strings
+# are correct on the Vault patch: the patched jobs write to Vault and never use AWS SM.
+sm:
+  aws_access_key_id: ""
+  aws_secret_access_key: ""
+
+custom_labels:
+  environment: drroc4
+  platform: openshift
+  gitops-owner: devops
