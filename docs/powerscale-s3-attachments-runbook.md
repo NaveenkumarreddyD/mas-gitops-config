@@ -3,7 +3,7 @@
 End-to-end steps to set up a PowerScale (OneFS) S3 bucket for IBM MAS Manage attachments,
 including the OneFS protocol settings and Manage properties that MAS needs to actually work.
 
-## Environment values (drroc4 / drgitopsapp)
+## Environment values (drroc4 / drrocapp)
 
 | Item | Value |
 |---|---|
@@ -153,7 +153,7 @@ Keep the **access key** and **secret key** handy for the next step.
 
 The endpoint uses the internal Spire CA. From a Manage server-bundle pod:
 ```bash
-oc exec -n mas-drgitopsapp-manage <pod> -- bash -c \
+oc exec -n mas-drrocapp-manage <pod> -- bash -c \
   "echo | openssl s_client -connect bhm-pwrsclnfs.lac1.biz:9021 -servername bhm-pwrsclnfs.lac1.biz 2>/dev/null | grep -i 'verify return code'"
 ```
 Want `0 (ok)`. If it fails, add the Spire CA to the Manage truststore before continuing.
@@ -174,7 +174,7 @@ into the UI (they are encrypted properties — set via UI, **never** raw SQL).
 | `mxe.doclink.securedAttachment` | `true` (required) |
 | `mxe.doclink.doctypes.defpath` | `cos:doclinks/default` |
 | `mxe.doclink.doctypes.topLevelPaths` | `cos:doclinks` |
-| `mxe.doclink.path01` | `cos:doclinks=https://drgitopswks.manage.drgitopsapp.apps.drroc4.lac1.biz/maximo/oslc/cosdoclink` |
+| `mxe.doclink.path01` | `cos:doclinks=https://drrocwks.manage.drrocapp.apps.drroc4.lac1.biz/maximo/oslc/cosdoclink` |
 
 > Store the keys in Vault for controlled handoff, but enter the encrypted properties through
 > the Manage UI. AVP does not configure Maximo database system properties.

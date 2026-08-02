@@ -7,7 +7,7 @@ ibm_sls:
   ibm_entitlement_key: "<path:secret/data/${ACCOUNT_ID}/${CLUSTER_ID}/entitlement#image_pull_secret_b64>"
   icr_cp_open: "icr.io/cpopen"
   run_sync_hooks: true
-  vault_addr: "http://vault-active.vault.svc.cluster.local:8200"
+  vault_addr: "https://vault.vault.svc.cluster.local:8200"
   vault_writer_role: "mas-gitops-writer"
   vault_kv_mount: "secret"
 

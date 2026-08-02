@@ -2,7 +2,7 @@
 
 Configure Maximo Manage "attached documents" (doclinks) to store files in Dell
 PowerScale (OneFS) S3 instead of a `/DOCLINKS` PVC or NFS share, for the
-`drroc4` / `drgitopsapp` instance.
+`drroc4` / `drrocapp` instance.
 
 ## What this is (and is NOT)
 
@@ -44,7 +44,7 @@ PowerScale (OneFS) S3 instead of a `/DOCLINKS` PVC or NFS share, for the
 
 ### 2. Store the handoff values in Vault
 
-Using the Vault UI, create `secret/mas/drroc4/drgitopsapp/manage-cos` with:
+Using the Vault UI, create `secret/drroc4/drroc4/drrocapp/manage-cos` with:
 
 | Field | Value |
 |---|---|
@@ -61,7 +61,7 @@ This path is a secure operator handoff; no chart reads it automatically.
 From a running Manage server-bundle pod, open a TLS session to the PowerScale endpoint:
 
 ```bash
-oc exec -n mas-drgitopsapp-manage <server-bundle-pod> -- bash -c \
+oc exec -n mas-drrocapp-manage <server-bundle-pod> -- bash -c \
   "echo | openssl s_client -connect bhm-pwrsclnfs.lac1.biz:9021 \
   -servername dr-maximo-bckt.bhm-pwrsclnfs.lac1.biz 2>/dev/null | grep -i 'verify return code'"
 ```
@@ -88,15 +88,15 @@ Re-run step 3 until it reports **PASS**.
 encrypts on write:
 - **Manage admin UI** (recommended): System Configuration → Platform
   Configuration → System Properties → set each value → **Live Refresh**. Take the
-  key values from Vault `secret/mas/drroc4/drgitopsapp/manage-cos`.
+  key values from Vault `secret/drroc4/drroc4/drrocapp/manage-cos`.
 - **Maximo REST API**: same properties + a live refresh, using the superuser
-  credential from the operator-generated secret `drgitopsapp-credentials-superuser`
-  in the `mas-drgitopsapp-core` namespace.
+  credential from the operator-generated secret `drrocapp-credentials-superuser`
+  in the `mas-drrocapp-core` namespace.
 - Set the non-encrypted properties through the same Manage UI and perform a Live Refresh.
 
 ### 6. Verify
 Create an attachment on any record; confirm the object appears in the
-`drgitopsapp-attachments` bucket on PowerScale. Existing filesystem attachments
+`dr-maximo-bckt` bucket on PowerScale. Existing filesystem attachments
 are **not** migrated automatically — plan a separate copy/migration if needed.
 
 ## Gotchas
@@ -173,5 +173,5 @@ symptom changes as you fix each layer.
 ## Records for this change
 
 - This document contains the endpoint, bucket, properties, and confirmed fixes.
-- Vault contains the credential handoff at `secret/mas/drroc4/drgitopsapp/manage-cos`.
+- Vault contains the credential handoff at `secret/drroc4/drroc4/drrocapp/manage-cos`.
 - The migration and acceptance evidence must be attached to the implementation ticket.

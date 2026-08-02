@@ -1,9 +1,8 @@
-
 #!/usr/bin/env python3
 """Render MAS GitOps config from base/ templates + envs/<cluster>.env.
 
 IBM-aligned (hub-and-spoke): ONE config repo branch holds EVERY cluster directory.
-Output is written to ./mas/<CLUSTER_ID>/...  at the repo root - exactly what the single
+Output is written to ./<ACCOUNT_ID>/<CLUSTER_ID>/... at the repo root - exactly what the single
 Account Root Application's cluster ApplicationSet globs (<account>/*/...).
 
 Usage:
