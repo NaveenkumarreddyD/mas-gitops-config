@@ -1,16 +1,19 @@
 # MAS GitOps configuration
 
-This repository contains the values discovered by IBM MAS GitOps ApplicationSets.
-It follows IBM's directory and `merge-key` convention directly. Installation reads
-the committed `mas/` YAML and does not run a local template generator.
+Per-env MAS configuration read by IBM MAS GitOps ApplicationSets. It follows IBM's
+`<account>/<cluster>/<instance>` hierarchy and `merge-key` convention.
+
+Each env runs on its own cluster with its own Argo CD and a **unique account** (convention:
+`account == clusterId`). The account-root globs `<account>/*/…`, so each env's Argo CD only ever
+sees its own subtree — that isolation is why the top-level dir is the account, not a shared `mas/`.
 
 ```text
-mas/
-  drroc4/
-    ibm-mas-cluster-base.yaml
+drroc4/                          # account (= clusterId)
+  drroc4/                        # cluster
+    ibm-mas-cluster-base.yaml    # cluster-scoped config
     ibm-operator-catalog.yaml
     ibm-dro.yaml
-    drgitopsapp/
+    drrocapp/                    # instance
       ibm-mas-instance-base.yaml
       ibm-sls.yaml
       ibm-mas-suite.yaml
@@ -18,16 +21,25 @@ mas/
       ibm-mas-workspaces.yaml
       ibm-mas-masapp-manage-install.yaml
       ibm-mas-masapp-configs.yaml
-docs/
-base/, envs/, render.py  # retained recovery tooling; not part of installation
+roc4/…  nroc4/…  doc4/…          # the other envs, same shape
+base/, envs/, render.py          # generator: envs/<cluster>.env + base/*.tpl -> the committed YAML
 ```
 
-Edit the YAML under `mas/`, validate it, and commit it. IBM's account root reads:
+Argo CD reads **only** the committed `<account>/…` YAML. `render.py` (via `render.sh`) generates it
+from `envs/<cluster>.env`:
 
-- `mas/<cluster>/*.yaml` for cluster-scoped configuration.
-- `mas/<cluster>/<instance>/*.yaml` for instance-scoped configuration.
+```bash
+# edit envs/<cluster>.env, then:
+./render.sh <cluster>            # writes <account>/<cluster>/<instance>/*.yaml
+git add <account> envs/<cluster>.env && git commit -m "..." && git push
+```
 
-Secrets are references only. During the temporary Vault implementation, AVP resolves
-`<path:secret/data/...>` placeholders. Never commit secret values.
+IBM's account root reads:
+
+- `<account>/<cluster>/*.yaml` — cluster-scoped configuration.
+- `<account>/<cluster>/<instance>/*.yaml` — instance-scoped configuration.
+
+Secrets are references only: AVP resolves `<path:secret/data/<account>/<cluster>/…>` from Vault at
+sync time. Never commit secret values.
 
 The end-to-end installation procedure is in the platform repository's `INSTALL.md`.
