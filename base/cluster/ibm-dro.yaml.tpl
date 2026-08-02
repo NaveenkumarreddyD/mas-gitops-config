@@ -6,7 +6,7 @@ ibm_dro:
   dro_install_plan: Automatic
   imo_install_plan: Automatic
   run_sync_hooks: true
-  vault_addr: "https://vault.vault.svc.cluster.local:8200"
+  vault_addr: "https://vault-active.vault.svc.cluster.local:8200"
   vault_writer_role: "mas-gitops-writer"
   vault_kv_mount: "secret"
 sm:
