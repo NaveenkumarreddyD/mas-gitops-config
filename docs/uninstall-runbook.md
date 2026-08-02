@@ -103,7 +103,7 @@ oc get crd certificates.cert-manager.io >/dev/null 2>&1 || ./bootstrap/05-operat
 
 - **Force-refresh** skips the ~3 min git poll; the actual teardown still takes its own time — watch `-w`.
 - Argo CD reads **GitLab**; you push to **GitHub**. Confirm each push reached GitLab before refreshing:
-  `git ls-remote https://gitlab.lac1.biz/gitops/mas-gitops-config.git refs/heads/mas-vault-deploy`
+  `git ls-remote https://gitlab.lac1.biz/gitops/mas-gitops-config.git refs/heads/main`
 - **Vault kept** = same secrets, no re-seed. **Mongo redeployed** = empty DB (new encryption keys) = true fresh MAS.
 - Finalizers clear via the operators (not stripped) — go layer-by-layer if one gets stuck in `Terminating`.
 - **Force teardown** (strips finalizers, one shot): `platform-gitops/scripts/delete-fast.sh --confirm doc4`.
