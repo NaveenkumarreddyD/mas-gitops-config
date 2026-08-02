@@ -1,7 +1,7 @@
 # `base/` template contract
 
 Templates here are rendered by `render.py` (`${VAR}` required, `${VAR:-default}` optional) into
-`mas/<cluster>/...` and read by ArgoCD. Templates are kept **comment-free**; the non-obvious rules
+`<account>/<cluster>/<instance>/...` and read by ArgoCD. Templates are kept **comment-free**; the non-obvious rules
 that, if broken, cause **silent failures** are recorded here instead.
 
 ## AVP secret references — do not treat `#` as a comment
