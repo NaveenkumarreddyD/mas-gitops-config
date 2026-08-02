@@ -30,5 +30,4 @@ Edit the YAML under `mas/`, validate it, and commit it. IBM's account root reads
 Secrets are references only. During the temporary Vault implementation, AVP resolves
 `<path:secret/data/...>` placeholders. Never commit secret values.
 
-See [CONFIGURATION.md](CONFIGURATION.md) for the verified value-to-chart mapping. The
-end-to-end installation procedure is in the platform repository's `INSTALL.md`.
+The end-to-end installation procedure is in the platform repository's `INSTALL.md`.
