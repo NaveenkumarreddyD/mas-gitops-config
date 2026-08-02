@@ -1,0 +1,5 @@
+merge-key: "drroc4/drroc4/drrocapp"
+
+ibm_mas_workspaces:
+  - mas_workspace_id: drrocwks
+    mas_workspace_name: "drrocwks"

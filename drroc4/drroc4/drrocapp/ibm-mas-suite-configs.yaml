@@ -1,7 +1,7 @@
-merge-key: "drroc4/drroc4/drgitopsapp"
+merge-key: "drroc4/drroc4/drrocapp"
 
 ibm_mas_suite_configs:
-  - mas_config_name: "drgitopsapp-sls-system"
+  - mas_config_name: "drrocapp-sls-system"
     mas_config_chart: ibm-mas-sls-config
     mas_config_scope: system
     mas_workspace_id:
@@ -9,12 +9,12 @@ ibm_mas_suite_configs:
     mas_config_kind: "slscfgs"
     mas_config_api_version: "config.mas.ibm.com"
     use_postdelete_hooks: true
-    registration_key: "<path:secret/data/drroc4/drroc4/drgitopsapp/sls#registration_key>"
-    url: "<path:secret/data/drroc4/drroc4/drgitopsapp/sls#url>"
+    registration_key: "<path:secret/data/drroc4/drroc4/drrocapp/sls#registration_key>"
+    url: "<path:secret/data/drroc4/drroc4/drrocapp/sls#url>"
     ca:
-      crt: "<path:secret/data/drroc4/drroc4/drgitopsapp/sls#ca.crt>"
+      crt: "<path:secret/data/drroc4/drroc4/drrocapp/sls#ca.crt>"
 
-  - mas_config_name: "drgitopsapp-bas-system"
+  - mas_config_name: "drrocapp-bas-system"
     mas_config_chart: ibm-mas-bas-config
     mas_config_scope: system
     mas_workspace_id:
@@ -31,7 +31,7 @@ ibm_mas_suite_configs:
     dro_ca:
       crt: "<path:secret/data/drroc4/drroc4/dro#ca.crt>"
 
-  - mas_config_name: "drgitopsapp-mongo-system"
+  - mas_config_name: "drrocapp-mongo-system"
     mas_config_chart: ibm-mas-mongo-config
     mas_config_scope: system
     mas_workspace_id:
@@ -39,11 +39,11 @@ ibm_mas_suite_configs:
     mas_config_kind: "mongocfgs"
     mas_config_api_version: "config.mas.ibm.com"
     use_postdelete_hooks: true
-    username: "<path:secret/data/drroc4/drroc4/drgitopsapp/mongo#username>"
-    password: "<path:secret/data/drroc4/drroc4/drgitopsapp/mongo#password>"
+    username: "<path:secret/data/drroc4/drroc4/drrocapp/mongo#username>"
+    password: "<path:secret/data/drroc4/drroc4/drrocapp/mongo#password>"
     config:
       hosts:
-        - host: "<path:secret/data/drroc4/drroc4/drgitopsapp/mongo#host>"
+        - host: "<path:secret/data/drroc4/drroc4/drrocapp/mongo#host>"
           port: 27017
       configDb: admin
       authMechanism: DEFAULT
@@ -52,9 +52,9 @@ ibm_mas_suite_configs:
         secretName: "system-mongo-credentials"
     certificates:
       - alias: ca
-        crt: "<path:secret/data/drroc4/drroc4/drgitopsapp/mongo#ca.crt>"
+        crt: "<path:secret/data/drroc4/drroc4/drrocapp/mongo#ca.crt>"
 
-  - mas_config_name: "drgitopsapp-jdbc-system"
+  - mas_config_name: "drrocapp-jdbc-system"
     mas_config_chart: ibm-jdbc-config
     mas_config_scope: system
     mas_workspace_id:
@@ -64,10 +64,10 @@ ibm_mas_suite_configs:
     use_postdelete_hooks: true
     jdbc_type: external
     jdbc_instance_name: oracle
-    jdbc_instance_username: "<path:secret/data/drroc4/drroc4/drgitopsapp/jdbc-system#username>"
-    jdbc_instance_password: "<path:secret/data/drroc4/drroc4/drgitopsapp/jdbc-system#password>"
-    jdbc_connection_url: "<path:secret/data/drroc4/drroc4/drgitopsapp/jdbc-system#jdbc_url>"
+    jdbc_instance_username: "<path:secret/data/drroc4/drroc4/drrocapp/jdbc-system#username>"
+    jdbc_instance_password: "<path:secret/data/drroc4/drroc4/drrocapp/jdbc-system#password>"
+    jdbc_connection_url: "<path:secret/data/drroc4/drroc4/drrocapp/jdbc-system#jdbc_url>"
     jdbc_ssl_enabled: false
     system_suite_jdbccfg_labels:
       mas.ibm.com/configScope: system
-      mas.ibm.com/instanceId: drgitopsapp
+      mas.ibm.com/instanceId: drrocapp

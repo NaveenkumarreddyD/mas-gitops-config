@@ -1,4 +1,4 @@
-merge-key: "drroc4/drroc4/drgitopsapp"
+merge-key: "drroc4/drroc4/drrocapp"
 
 account:
   id: drroc4
@@ -12,7 +12,7 @@ cluster:
   nonshared: ""
 
 instance:
-  id: drgitopsapp
+  id: drrocapp
 
 # Required by IBM 8.4.0 instance-root templates (unconditional .Values.sm.* references).
 # Empty on the Vault patch — the patched jobs write to Vault, not AWS SM.
