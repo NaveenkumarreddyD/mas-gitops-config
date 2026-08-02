@@ -13,8 +13,6 @@ ibm_mas_suite:
   mas_usability_metrics: true
   mas_annotations:
     mas.ibm.com/operationalMode: nonproduction
-  mas_manual_cert_mgmt: true
-  # IBM's Suite chart is the sole owner of the MAS core public certificate.
-  tls_cert: "<path:secret/data/doc4/doc4/docapp/certs/public#tls_crt_b64>"
-  tls_key:  "<path:secret/data/doc4/doc4/docapp/certs/public#tls_key_b64>"
-  ca_cert:  "<path:secret/data/doc4/doc4/docapp/certs/public#ca_crt_b64>"
+  # false (default): MAS auto-generates a self-signed core cert (no certs/public seed needed).
+  # true: you provide the cert — seed certs/public in Vault and the tls_* lines below are rendered.
+  mas_manual_cert_mgmt: false

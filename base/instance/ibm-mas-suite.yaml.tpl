@@ -13,8 +13,12 @@ ibm_mas_suite:
   mas_usability_metrics: true
   mas_annotations:
     mas.ibm.com/operationalMode: ${OPERATIONAL_MODE}
-  mas_manual_cert_mgmt: true
+  # false (default): MAS auto-generates a self-signed core cert (no certs/public seed needed).
+  # true: you provide the cert — seed certs/public in Vault and the tls_* lines below are rendered.
+  mas_manual_cert_mgmt: ${MAS_MANUAL_CERT_MGMT:-false}
+{{IF_TRUE MAS_MANUAL_CERT_MGMT}}
   # IBM's Suite chart is the sole owner of the MAS core public certificate.
   tls_cert: "<path:secret/data/${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/certs/public#tls_crt_b64>"
   tls_key:  "<path:secret/data/${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/certs/public#tls_key_b64>"
   ca_cert:  "<path:secret/data/${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/certs/public#ca_crt_b64>"
+{{END_IF}}

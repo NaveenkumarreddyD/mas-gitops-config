@@ -22,6 +22,10 @@ VAR = re.compile(r"\$\{([A-Z0-9_]+)(?::-([^}]*))?\}")
 # MANAGE_AUTO_GENERATE_ENCRYPTION_KEYS=true (MAS generates its own keys, so providing them is
 # redundant and would add an unwanted AVP dependency on the manage-crypto secret).
 IF_FALSE = re.compile(r"^[ \t]*\{\{IF_FALSE ([A-Z0-9_]+)\}\}[ \t]*\n(.*?)\n[ \t]*\{\{END_IF\}\}[ \t]*\n", re.DOTALL | re.MULTILINE)
+# {{IF_TRUE VAR}} ... {{END_IF}} renders the body ONLY when env[VAR] IS truthy (the mirror of
+# IF_FALSE). Used e.g. to include the manual tls_cert/tls_key/ca_cert lines only when
+# MAS_MANUAL_CERT_MGMT=true; when false, MAS auto-generates a self-signed core cert.
+IF_TRUE = re.compile(r"^[ \t]*\{\{IF_TRUE ([A-Z0-9_]+)\}\}[ \t]*\n(.*?)\n[ \t]*\{\{END_IF\}\}[ \t]*\n", re.DOTALL | re.MULTILINE)
 
 # Fully declarative: every cluster/instance config + app renders for every cluster. There are NO
 # ENABLE_* staging toggles. Runtime-dependent configs (SLSCfg/BASCfg) simply sit Degraded until
@@ -40,7 +44,8 @@ def load_env(path):
     return env
 
 def strip_conditionals(text, env):
-    # Keep the {{IF_FALSE VAR}} body only when env[VAR] is NOT truthy; drop the whole block otherwise.
+    # {{IF_TRUE VAR}} keeps its body only when VAR is truthy; {{IF_FALSE VAR}} only when it is NOT.
+    text = IF_TRUE.sub(lambda m: m.group(2) + "\n" if truthy(env.get(m.group(1), "")) else "", text)
     return IF_FALSE.sub(lambda m: "" if truthy(env.get(m.group(1), "")) else m.group(2) + "\n", text)
 
 def render(text, env, src):
