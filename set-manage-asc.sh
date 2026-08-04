@@ -29,7 +29,43 @@
 #   * jms.xml is the JMS *server* fragment (wasJmsServer-1.0 + messagingEngine/queues), NOT a client.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
-ENV="${1:?usage: set-manage-asc.sh <env> [--ui-cron f] [--ui f] [--cron f] [--mea f] [--report f] [--jms f] [--render]}"; shift
+
+usage(){ cat <<'EOF'
+set-manage-asc.sh — encode Manage server.xml fragments into MANAGE_<BUNDLE>_ASC_B64 env vars.
+
+Keep readable XML per env under manage-asc/<env>/; this base64-encodes it into envs/<env>.env,
+then optionally re-renders. Each bundle is opt-in — only the vars you set here render.
+
+USAGE
+  ./set-manage-asc.sh <env> [--render]                     # auto-discover manage-asc/<env>/
+  ./set-manage-asc.sh <env> [FILE FLAGS...] [--render]     # explicit files
+
+FILE FLAGS  (each takes a path to a Liberty server.xml fragment)
+  --ui-cron FILE   same file for BOTH ui and cron (shorthand)
+  --ui FILE        ui bundle      (JMS client)
+  --cron FILE      cron bundle    (JMS client)
+  --mea FILE       mea bundle     (JMS client)
+  --report FILE    report bundle  (JMS client)
+  --jms FILE       jms bundle     (JMS SERVER: wasJmsServer-1.0 + messagingEngine/queues)
+  --render         run ./render.sh <env> after updating the env file
+  -h, --help       this help
+
+AUTO-DISCOVERY (no file flags) reads manage-asc/<env>/:
+  ui-cron.xml -> ui+cron   ui.xml -> ui   cron.xml -> cron
+  mea.xml -> mea   report.xml -> report   jms.xml -> jms
+  Only files that exist are applied; a missing bundle stays at the operator default.
+
+EXAMPLES
+  cp cron_ui.xml manage-asc/doc4/ui-cron.xml && cp mea.xml jms.xml manage-asc/doc4/
+  ./set-manage-asc.sh doc4 --render
+  ./set-manage-asc.sh doc4 --ui-cron cron_ui.xml --mea mea.xml --jms jms.xml --render
+
+Client fragments embed the cluster's jms host — keep them per-env. XML is validated before encoding.
+EOF
+}
+
+case "${1:-}" in -h|--help) usage; exit 0 ;; "") usage >&2; exit 2 ;; esac
+ENV="$1"; shift
 ENVFILE="$ROOT/envs/$ENV.env"
 [[ -f "$ENVFILE" ]] || { echo "ERROR: no env file: $ENVFILE" >&2; exit 2; }
 
@@ -44,8 +80,8 @@ while [[ $# -gt 0 ]]; do
     --jms)     SRC_JMS="$2"; shift 2 ;;
     --ui-cron) SRC_UI="$2"; SRC_CRON="$2"; shift 2 ;;
     --render)  RENDER=1; shift ;;
-    -h|--help) sed -n '2,22p' "$0"; exit 0 ;;
-    *) echo "ERROR: unknown arg: $1" >&2; exit 2 ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "ERROR: unknown arg: $1" >&2; echo "run: $(basename "$0") --help" >&2; exit 2 ;;
   esac
 done
 
