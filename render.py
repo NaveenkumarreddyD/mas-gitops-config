@@ -25,6 +25,11 @@ IF_FALSE = re.compile(r"^[ \t]*\{\{IF_FALSE ([A-Z0-9_]+)\}\}[ \t]*\n(.*?)\n[ \t]
 # IF_FALSE). Used e.g. to include the manual tls_cert/tls_key/ca_cert lines only when
 # MAS_MANUAL_CERT_MGMT=true; when false, MAS auto-generates a self-signed core cert.
 IF_TRUE = re.compile(r"^[ \t]*\{\{IF_TRUE ([A-Z0-9_]+)\}\}[ \t]*\n(.*?)\n[ \t]*\{\{END_IF\}\}[ \t]*\n", re.DOTALL | re.MULTILINE)
+# {{IF_SET VAR}} ... {{END_IF}} renders the body ONLY when env[VAR] has a non-empty value. Unlike
+# IF_TRUE (which needs a boolean 1/true/yes), this is "opt-in when a value is passed" — e.g. a
+# per-bundle server.xml base64 that renders its Secret + additionalServerConfig only when supplied;
+# left empty, the bundle falls back to the Manage operator default.
+IF_SET = re.compile(r"^[ \t]*\{\{IF_SET ([A-Z0-9_]+)\}\}[ \t]*\n(.*?)\n[ \t]*\{\{END_IF\}\}[ \t]*\n", re.DOTALL | re.MULTILINE)
 
 # Fully declarative: every cluster/instance config + app renders for every cluster. There are NO
 # ENABLE_* staging toggles. Runtime-dependent configs (SLSCfg/BASCfg) simply sit Degraded until
@@ -43,6 +48,8 @@ def load_env(path):
     return env
 
 def strip_conditionals(text, env):
+    # {{IF_SET VAR}} keeps its body only when VAR has a non-empty value (opt-in when passed).
+    text = IF_SET.sub(lambda m: m.group(2) + "\n" if env.get(m.group(1), "").strip() else "", text)
     # {{IF_TRUE VAR}} keeps its body only when VAR is truthy; {{IF_FALSE VAR}} only when it is NOT.
     text = IF_TRUE.sub(lambda m: m.group(2) + "\n" if truthy(env.get(m.group(1), "")) else "", text)
     return IF_FALSE.sub(lambda m: "" if truthy(env.get(m.group(1), "")) else m.group(2) + "\n", text)
