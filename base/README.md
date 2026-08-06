@@ -35,8 +35,9 @@ Lines like `"<path:secret/data/<acct>/<cluster>/<inst>/manage-crypto#cryptoKey>"
     for migration validation and rollback.
   - `s3` renders the same S3 configuration without the legacy `/doclinks` PVC.
   - Unset preserves legacy behavior and renders no attachment-provider override.
-  S3 values come from Vault `manage-cos`; Git contains references only. IBM requires the S3 secret
-  key in a Kubernetes Secret with key `accessSecretKey`, created by the application config chart.
+  The S3 endpoint, bucket, access key, and CA chain come from Vault `manage-cos`; Git contains
+  references only. IBM requires the S3 secret key in a separately created Kubernetes Secret with
+  key `accessSecretKey`. This Secret is manual until external-secrets automation is available.
 
 ## Per-env overrides (no env-file bloat)
 Use `${VAR:-default}` so the template carries a default and an env sets the var only to override:

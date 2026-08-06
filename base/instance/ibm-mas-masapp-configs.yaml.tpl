@@ -40,11 +40,6 @@ ibm_mas_masapp_configs:
       MXE_SECURITY_CRYPTO_KEY: "<path:secret/data/${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/manage-crypto#cryptoKey>"
       MXE_SECURITY_CRYPTOX_KEY: "<path:secret/data/${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/manage-crypto#cryptoxKey>"
 {{END_IF}}
-{{IF_IN MANAGE_ATTACHMENT_PROVIDER s3-migration,s3}}
-    manage_attachment_s3_secret_name: ${WORKSPACE_ID}-manage-s3-secret
-    manage_attachment_s3_access_secret_key: "<path:secret/data/${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/manage-cos#secret_key>"
-{{END_IF}}
-
     mas_appws_spec:
       bindings:
         jdbc: system

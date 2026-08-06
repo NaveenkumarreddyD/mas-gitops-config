@@ -1,9 +1,10 @@
-# PowerScale (OneFS) S3 Setup for MAS Attachments — PowerScale Side Only
+# PowerScale S3 setup for MAS attachments
 
-Simple OneFS steps to prepare an S3 bucket for IBM MAS Manage attachments.
-(Manage-side configuration is a separate doc.)
+This document contains only the Dell PowerScale OneFS work required before MAS
+Manage can use an S3 bucket. The MAS configuration and migration procedure is in
+[Manage attachments on PowerScale S3](./manage-attachments-powerscale-s3.md).
 
-## Values (drroc4)
+## Environment values
 
 | Item | Value |
 |---|---|
@@ -12,116 +13,163 @@ Simple OneFS steps to prepare an S3 bucket for IBM MAS Manage attachments.
 | S3 user | `dr_maximo` |
 | Group | `s3_mas_attach_users` |
 | Access zone | `data` |
-| S3 endpoint | `https://bhm-pwrsclnfs.lac1.biz:9021` (VIP 10.1.108.198) |
+| S3 endpoint | `https://bhm-pwrsclnfs.lac1.biz:9021` |
 
----
+## Provisioning
 
-## 1. Enable S3
+### 1. Enable HTTPS S3
 
 ```bash
-isi s3 settings global modify --enabled true      # HTTPS/9021; HTTP/9020 stays off
+isi s3 settings global modify --enabled true
 ```
 
-## 2. Confirm the bucket and S3 user
+Keep HTTP port 9020 disabled. MAS uses HTTPS port 9021.
+
+### 2. Confirm the bucket and S3 identity
 
 ```bash
 isi s3 keys list
 isi s3 buckets view dr-maximo-bckt
 ```
-Bucket owner and access key user should both be `dr_maximo`.
 
-## 3. Enter the access zone
+The bucket owner and access-key user should both be `dr_maximo`.
+
+### 3. Enter the access zone
 
 ```bash
 isi zone zones view --zone=data
-isi_run -z <ZONE_ID> -l root      # example: isi_run -z 2 -l root
+isi_run -z <ZONE_ID> -l root
 ```
 
-## 4. Set bucket directory ownership
+### 4. Configure filesystem ownership and ACLs
 
 ```bash
 chown dr_maximo:s3_mas_attach_users /ifs/stl-pwrsc/data/S3/DR-Maximo-Bckt
-```
 
-## 5. Add parent directory traverse access
-
-```bash
 chmod +a group s3_mas_attach_users allow dir_gen_execute /ifs/stl-pwrsc
 chmod +a group s3_mas_attach_users allow dir_gen_execute /ifs/stl-pwrsc/data
 chmod +a group s3_mas_attach_users allow dir_gen_execute /ifs/stl-pwrsc/data/S3
+
+chmod +a group s3_mas_attach_users allow \
+  dir_gen_all,file_gen_all,object_inherit,container_inherit \
+  /ifs/stl-pwrsc/data/S3/DR-Maximo-Bckt
 ```
 
-## 6. Add bucket directory access
+Parent directories require traverse access. The bucket directory requires the
+read, write, create, and delete permissions used by Manage. For an existing
+bucket, review the effect before applying ACL changes recursively.
 
-```bash
-chmod +a group s3_mas_attach_users allow dir_gen_all,file_gen_all,object_inherit,container_inherit /ifs/stl-pwrsc/data/S3/DR-Maximo-Bckt
-```
-Existing bucket with files → add `-R`: `chmod -R +a group ... /ifs/stl-pwrsc/data/S3/DR-Maximo-Bckt`
+### 5. Configure the bucket ACL
 
-## 7. Set the S3 bucket ACL
+Grant the dedicated MAS identity bucket-scoped access:
 
-Grant the MAS user full control (UI or CLI):
 ```text
 dr_maximo = FULL_CONTROL
 ```
-S3 needs **both** the bucket ACL and the filesystem permissions (steps 4–6).
 
-## 8. Enable virtual-hosted-style addressing
+Both the S3 bucket ACL and the OneFS filesystem permissions must allow access.
 
-MAS connects as `dr-maximo-bckt.bhm-pwrsclnfs.lac1.biz`, so OneFS must accept bucket-in-hostname:
+### 6. Enable virtual-hosted S3 addressing
+
+Manage connects to `<bucket>.<endpoint>`. Configure OneFS, DNS, and the endpoint
+certificate for that hostname pattern:
 
 ```bash
-# find groupnet: isi network pools list  (SC DNS name = bhm-pwrsclnfs.lac1.biz; pool ID = groupnet.subnet.pool)
+isi network pools list
 isi network groupnets modify <groupnet> --allow-wildcard-subdomains=true
-isi s3 settings zone modify --zone=data --base-domain=bhm-pwrsclnfs.lac1.biz
+isi s3 settings zone modify --zone=data \
+  --base-domain=bhm-pwrsclnfs.lac1.biz
 ```
-Also needs wildcard DNS `*.bhm-pwrsclnfs.lac1.biz → 10.1.108.198`.
 
-## 9. Enable MD5 ETags
+Create wildcard DNS pointing `*.bhm-pwrsclnfs.lac1.biz` to the S3 VIP. The TLS
+certificate must include the same wildcard name in its SAN list.
 
-MAS verifies uploads by MD5; OneFS must return MD5 ETags:
+### 7. Enable MD5 ETags
+
+Manage verifies uploads against the returned ETag:
 
 ```bash
 isi s3 settings zone modify --zone=data --use-md5-for-etag=true
 ```
 
-## 10. Certificate must cover the wildcard host
+Without this setting, OneFS can store the object while the Manage transaction
+still fails its integrity check.
 
-The S3 endpoint cert must include a `*.bhm-pwrsclnfs.lac1.biz` SAN. Verify:
+## Validation
 
-```bash
-echo | openssl s_client -connect bhm-pwrsclnfs.lac1.biz:9021 -servername bhm-pwrsclnfs.lac1.biz 2>/dev/null \
-  | openssl x509 -noout -ext subjectAltName
-```
-Look for `DNS:*.bhm-pwrsclnfs.lac1.biz`.
-
----
-
-## Quick test (from any host with the access key)
+Verify the certificate SAN:
 
 ```bash
-# path-style
-s3cmd put test.txt s3://dr-maximo-bckt/test.txt \
-  --host=bhm-pwrsclnfs.lac1.biz:9021 --host-bucket='bhm-pwrsclnfs.lac1.biz:9021' \
+echo | openssl s_client \
+  -connect bhm-pwrsclnfs.lac1.biz:9021 \
+  -servername dr-maximo-bckt.bhm-pwrsclnfs.lac1.biz 2>/dev/null \
+  | openssl x509 -noout -subject -issuer -dates -ext subjectAltName
+```
+
+Test basic path-style access and the virtual-hosted request pattern used by
+Manage:
+
+```bash
+echo "PowerScale S3 test" > test.txt
+
+s3cmd put test.txt s3://dr-maximo-bckt/path-test.txt \
+  --host=bhm-pwrsclnfs.lac1.biz:9021 \
+  --host-bucket='bhm-pwrsclnfs.lac1.biz:9021' \
   --ca-certs=/etc/pki/ca-trust/source/anchors/spire-chain.cer
 
-# virtual-hosted (must pass after steps 8–9 — this is how MAS connects)
-s3cmd put test.txt s3://dr-maximo-bckt/vhtest.txt \
-  --host=bhm-pwrsclnfs.lac1.biz:9021 --host-bucket='%(bucket)s.bhm-pwrsclnfs.lac1.biz:9021' \
+s3cmd put test.txt s3://dr-maximo-bckt/virtual-host-test.txt \
+  --host=bhm-pwrsclnfs.lac1.biz:9021 \
+  --host-bucket='%(bucket)s.bhm-pwrsclnfs.lac1.biz:9021' \
   --ca-certs=/etc/pki/ca-trust/source/anchors/spire-chain.cer
 ```
 
-## If it fails
+Confirm list, download, and delete operations before handing the bucket to the
+MAS team.
 
-| Error | Fix |
+## Handoff to the MAS team
+
+Provide these values through the approved secret-transfer process:
+
+| Value | Purpose |
 |---|---|
-| `403 AccessDenied` | ACLs — steps 4–7 (`ls -led <path>`, `id dr_maximo`) |
-| cert error naming `dr-maximo-bckt.bhm-pwrsclnfs.lac1.biz` | step 10 — add `*.bhm-pwrsclnfs.lac1.biz` SAN |
-| `InvalidBucketName` | step 8 — base domain + wildcard subdomains |
-| `Unable to verify integrity of data upload` | step 9 — `--use-md5-for-etag=true` |
+| Endpoint | `ManageWorkspace` `s3Url` |
+| Bucket name | Attachment destination |
+| Access key | S3 identity |
+| Secret key | S3 credential secret |
+| SubCA PEM | Manage imported certificate chain |
+| Root CA PEM | Manage imported certificate chain |
 
-## Notes
+Never place the secret key in Git, tickets, chat, or email.
 
-- Parent dirs need only traverse/execute; bucket dir needs full read/write/create/delete.
-- Prefer group ACLs over per-user for multiple MAS/S3 users.
-- Steps 8–9 (base domain, MD5 ETag) are **per access zone**.
+## Production operations
+
+- Use a dedicated S3 identity and bucket-scoped permissions. Rotate credentials
+  on an agreed schedule with the MAS team.
+- Set capacity and object-count quotas and alerts based on measured attachment
+  growth. Include metadata performance in capacity planning.
+- Protect the bucket path with SnapshotIQ and, where required, SyncIQ. Coordinate
+  recovery points with the Manage database backup schedule.
+- Monitor the S3 service, endpoint certificate expiry, DNS, access-zone health,
+  capacity, object count, ACL changes, and ETag behavior.
+- Apply change control to the base domain, wildcard DNS, TLS certificate, ACLs,
+  and `use-md5-for-etag` setting because changes can stop all Manage attachment
+  operations.
+
+## Troubleshooting
+
+| Symptom | Check |
+|---|---|
+| `403 AccessDenied` | Bucket ACL, filesystem ACLs, ownership, and access-zone identity |
+| TLS hostname error | Wildcard DNS and certificate SAN for `<bucket>.<endpoint>` |
+| `InvalidBucketName` | Base domain and wildcard-subdomain settings |
+| Upload integrity error | `use-md5-for-etag=true` on the correct access zone |
+
+## Storage acceptance checklist
+
+- [ ] HTTPS S3 is enabled and HTTP is disabled.
+- [ ] Dedicated user, key, bucket, filesystem ACLs, and bucket ACL are verified.
+- [ ] Virtual-hosted upload, download, list, and delete operations pass.
+- [ ] Wildcard DNS and certificate SAN cover `<bucket>.<endpoint>`.
+- [ ] MD5 ETags are enabled and verified.
+- [ ] Capacity alerts, snapshots, replication, and ownership are documented.
+- [ ] Endpoint, credentials, and CA chain are transferred securely to the MAS team.
