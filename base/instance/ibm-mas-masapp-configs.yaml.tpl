@@ -80,7 +80,7 @@ ibm_mas_masapp_configs:
             providerSourceType: s3
             s3:
               providerCredentials:
-                cosAwsUrl: "<path:secret/data/${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/manage-cos#endpoint>"
+                s3Url: "<path:secret/data/${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/manage-cos#endpoint>"
                 bucketName: "<path:secret/data/${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/manage-cos#bucket>"
                 accessKey: "<path:secret/data/${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/manage-cos#access_key>"
                 secretKey:

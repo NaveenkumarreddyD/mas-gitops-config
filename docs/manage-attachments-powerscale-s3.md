@@ -23,6 +23,9 @@ instance template supports filesystem, migration, and S3-only modes.
 - The PowerScale SubCA and Root CA are supplied through
   `ManageWorkspace.spec.settings.deployment.importedCerts` so the Manage server
   bundles trust the private S3 endpoint.
+- The deployed Manage CRD requires `providerCredentials.s3Url`; it is populated
+  from the Vault `endpoint` field. Some IBM documentation still shows the older
+  `cosAwsUrl` field, which this CRD rejects.
 
 ## The properties
 
