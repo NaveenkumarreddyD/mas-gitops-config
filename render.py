@@ -53,8 +53,9 @@ def load_env(path):
     return env
 
 def strip_conditionals(text, env):
-    # Enum selector used by the attachment backend: file storage, S3 with the legacy PVC retained,
-    # or final S3-only operation.
+    # Attachment transition mode: file storage, S3 with the legacy PVC retained,
+    # or final S3-only operation. On Manage 8.7.24 the S3 runtime properties are
+    # configured separately; these modes control the PVC and imported CA resources.
     text = IF_IN.sub(
         lambda m: m.group(3) + "\n" if env.get(m.group(1), "").strip() in m.group(2).split(",") else "",
         text,

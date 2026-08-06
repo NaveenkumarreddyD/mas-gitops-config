@@ -1,30 +1,34 @@
-# Manage attachments on PowerScale S3
+# Manage 8.7.24 attachments on PowerScale S3
 
-This is the source of truth for the MAS and GitOps side of Maximo Manage
-attachments on Dell PowerScale S3. PowerScale provisioning is documented in
+This is the source of truth for migrating Maximo Manage 8.7.24 attachments from
+PowerScale NFS to PowerScale S3. PowerScale provisioning is documented in
 [PowerScale S3 setup](./powerscale-s3-onefs-setup.md).
 
-## Ownership
+## Supported configuration for 8.7.24
 
-| Area | Owner |
+IBM GitOps 8.4.0 passes `mas_appws_spec` directly into the `ManageWorkspace`
+custom resource. It does not translate attachment settings into Maximo system
+properties.
+
+The installed CRD accepts
+`spec.settings.db.attachmentProvider.s3.providerCredentials.s3Url`, but on the
+tested Manage 8.7.24 deployment the operator did not materialize that block into
+the server bundles. A successful `ManageWorkspace` reconciliation therefore does
+not prove that S3 attachment storage is active.
+
+For Manage 8.7.24, configure S3 with the nine IBM-documented Maximo system
+properties. The GitOps template deliberately does not render the nonfunctional
+S3 `attachmentProvider` block or the related Kubernetes Secret.
+
+## GitOps modes
+
+Set one mode in the target environment file:
+
+| `MANAGE_ATTACHMENT_PROVIDER` | GitOps behavior |
 |---|---|
-| Bucket, S3 user, ACLs, DNS, TLS endpoint, ETag behavior | PowerScale/storage team |
-| Vault values, GitOps configuration, ManageWorkspace, migration, validation | MAS/platform team |
-| Coordinated database and attachment backup/restore | Both teams |
-
-The MAS `ObjectStorageCfg` resource does not configure Manage attachments. The
-attachment provider is owned by
-`ManageWorkspace.spec.settings.db.attachmentProvider`.
-
-## GitOps configuration
-
-Set one attachment mode in the environment file:
-
-| `MANAGE_ATTACHMENT_PROVIDER` | Provider | `/doclinks` PVC |
-|---|---|---|
-| `filestorage` | File storage | Mounted |
-| `s3-migration` | S3 | Retained for migration validation and rollback |
-| `s3` | S3 | Not mounted |
+| `filestorage` | Configure the file provider and mount `/doclinks` |
+| `s3-migration` | Import PowerScale CAs and keep `/doclinks` mounted |
+| `s3` | Import PowerScale CAs without mounting the legacy `/doclinks` PVC |
 
 The filesystem modes also support:
 
@@ -33,126 +37,120 @@ MANAGE_DOCLINKS_PATH=/doclinks
 MANAGE_DOCLINKS_SIZE=100Gi
 ```
 
-For S3 modes, the renderer creates this provider configuration:
-
-```yaml
-attachmentProvider:
-  providerSourceType: s3
-  s3:
-    providerCredentials:
-      s3Url: "<Vault endpoint>"
-      bucketName: "<Vault bucket>"
-      accessKey: "<Vault access_key>"
-      secretKey:
-        secretName: <workspace>-manage-s3-secret
-```
-
-The installed Manage CRD requires `providerCredentials.s3Url`. It rejects the
-older `cosAwsUrl` field shown in some IBM documentation.
+Use `s3-migration` until conversion, validation, and the rollback window are
+complete. Changing to `s3` removes the mount from the Manage pod specification;
+it does not delete the PVC or its data.
 
 ## Vault contract
 
-Create the following Vault entry once:
+Keep the PowerScale values at:
 
 ```text
 secret/<account>/<cluster>/<instance>/manage-cos
 ```
 
-| Field | Content |
+| Vault field | Use |
 |---|---|
-| `endpoint` | PowerScale HTTPS S3 endpoint, including port 9021 |
-| `bucket` | Existing PowerScale bucket name |
-| `access_key` | PowerScale S3 access key |
-| `secret_key` | PowerScale S3 secret key |
-| `powerscale_s3_subca` | SubCA certificate in PEM format |
-| `powerscale_s3_rootca` | Root CA certificate in PEM format |
+| `endpoint` | `mxe.cosendpointuri` |
+| `bucket` | `mxe.cosbucketname` |
+| `access_key` | `mxe.cosaccesskey` |
+| `secret_key` | `mxe.cossecretkey` |
+| `powerscale_s3_subca` | Manage imported certificate |
+| `powerscale_s3_rootca` | Manage imported certificate |
 
-Argo CD Vault Plugin resolves the endpoint, bucket, access key, and certificates
-during rendering. The current deployment does not create the Kubernetes Secret.
-Create `<workspace>-manage-s3-secret` manually from the Vault `secret_key` value
-before synchronizing the `ManageWorkspace`. Do not commit the credential.
+Argo CD Vault Plugin resolves only the two CA certificates into
+`settings.deployment.importedCerts`. Until an approved external-secrets or API
+integration is available, enter the four S3 connection values manually in
+Manage. Do not commit them to Git or place them in `bundleLevelProperties`.
+
+## Required Manage properties
+
+In Manage, open **System Configuration > Platform Configuration > System
+Properties**. Set the global values below and save them. Use the Manage UI or API
+for the credential properties so Maximo handles their encrypted values; do not
+update them with raw SQL.
+
+| Property | Value |
+|---|---|
+| `mxe.attachmentstorage` | `com.ibm.tivoli.maximo.oslc.provider.COSAttachmentStorage` |
+| `mxe.cosendpointuri` | PowerScale HTTPS S3 endpoint, including port `9021` |
+| `mxe.cosbucketname` | PowerScale bucket name |
+| `mxe.cosaccesskey` | PowerScale access key |
+| `mxe.cossecretkey` | PowerScale secret key |
+| `mxe.doclink.securedAttachment` | `true` |
+| `mxe.doclink.doctypes.defpath` | `cos:doclinks/default` |
+| `mxe.doclink.doctypes.topLevelPaths` | `cos:doclinks` |
+| `mxe.doclink.path01` | `cos:doclinks=https://<manage-ui-route>/maximo/oslc/cosdoclink` |
+
+If converted objects keep nested directory names, also test whether the 8.7.24
+environment requires `mxe.cosnestedfile=1` before using it in production.
+
+Restart every Manage server bundle after saving the properties unless each
+property is confirmed to support Live Refresh.
 
 ## Deployment procedure
 
-### 1. Complete the prerequisites
+### 1. Prepare and baseline
 
-- Complete the [PowerScale S3 setup](./powerscale-s3-onefs-setup.md).
-- Confirm the Vault entry contains all six required fields.
-- Create the required Kubernetes Secret as described below.
-- Confirm `mxe.doclink.securedAttachment` is `true` in Manage.
-- Create a known set of file-storage attachments and record their database IDs,
-  object types, filenames, sizes, and checksums.
-- Take a database backup and a coordinated snapshot of the `/doclinks` volume.
+1. Complete the [PowerScale S3 setup](./powerscale-s3-onefs-setup.md).
+2. Confirm all six Vault fields exist.
+3. Create a known set of NFS-backed test attachments and record their database
+   IDs, record types, filenames, sizes, and checksums.
+4. Take a coordinated database backup and `/doclinks` snapshot.
 
-### 2. Create the S3 Secret
+### 2. Retain NFS and import the S3 CA chain
 
-Read the `secret_key` value from Vault, then enter it without placing it in shell
-history:
-
-```bash
-read -s -p "PowerScale S3 secret key: " S3_SECRET_KEY
-echo
-
-oc create secret generic drgitopswks-manage-s3-secret \
-  -n mas-drgitopsapp-manage \
-  --from-literal=accessSecretKey="$S3_SECRET_KEY" \
-  --dry-run=client -o yaml | oc apply -f -
-
-unset S3_SECRET_KEY
-```
-
-The name, namespace, and data key must exactly match the `ManageWorkspace`
-reference. The Secret is intentionally maintained outside Argo CD until an
-external-secrets controller is available.
-
-### 3. Enable migration mode
+Set and render:
 
 ```text
 MANAGE_ATTACHMENT_PROVIDER=s3-migration
 ```
 
-Render the environment, review the generated `ManageWorkspace`, commit it, and
-allow Argo CD to synchronize. Migration mode makes S3 the configured provider
-while retaining the legacy PVC for the controlled conversion and rollback
-window.
-
-### 4. Verify the generated resources
-
-Set the values for the target workspace:
+Commit the rendered configuration and let Argo CD synchronize it. Verify that
+the legacy PVC remains mounted and the CA entries are present:
 
 ```bash
 export INSTANCE_ID=drgitopsapp
 export WORKSPACE_ID=drgitopswks
 export MANAGE_NS=mas-${INSTANCE_ID}-manage
 export MANAGEWORKSPACE=${INSTANCE_ID}-${WORKSPACE_ID}
-export S3_SECRET=${WORKSPACE_ID}-manage-s3-secret
-```
 
-Confirm the provider configuration:
-
-```bash
 oc get manageworkspace "$MANAGEWORKSPACE" -n "$MANAGE_NS" \
-  -o jsonpath='{.spec.settings.db.attachmentProvider}{"\n"}'
-```
+  -o jsonpath='{.spec.settings.deployment.importedCerts[*].alias}{"\n"}'
 
-Confirm the S3 secret exists without printing it:
-
-```bash
-oc get secret "$S3_SECRET" -n "$MANAGE_NS" \
-  -o jsonpath='{.data.accessSecretKey}' | wc -c
-```
-
-Confirm the workspace reconciles successfully:
-
-```bash
 oc get manageworkspace "$MANAGEWORKSPACE" -n "$MANAGE_NS" \
-  -o jsonpath='{range .status.conditions[*]}{.type}{"="}{.status}{"  "}{.message}{"\n"}{end}'
+  -o jsonpath='{range .spec.settings.deployment.persistentVolumes[*]}{.pvcName}{" -> "}{.mountPath}{"\n"}{end}'
 ```
 
-### 5. Verify TLS from Manage
+### 3. Configure and verify the runtime properties
 
-The S3 modes import the Vault SubCA and Root CA through
-`spec.settings.deployment.importedCerts`. From a running server-bundle pod:
+Set the nine properties in Manage, restart all server bundles, then verify the
+stored non-secret values in Oracle:
+
+```sql
+SELECT propname,
+       CASE
+         WHEN LOWER(propname) IN ('mxe.cosaccesskey', 'mxe.cossecretkey')
+           THEN CASE WHEN propvalue IS NULL THEN '<missing>' ELSE '<configured>' END
+         ELSE propvalue
+       END AS propvalue,
+       servername
+FROM maximo.maxpropvalue
+WHERE LOWER(propname) IN (
+  'mxe.attachmentstorage',
+  'mxe.cosendpointuri',
+  'mxe.cosbucketname',
+  'mxe.cosaccesskey',
+  'mxe.cossecretkey',
+  'mxe.doclink.securedattachment',
+  'mxe.doclink.doctypes.defpath',
+  'mxe.doclink.doctypes.toplevelpaths',
+  'mxe.doclink.path01'
+)
+ORDER BY propname, servername;
+```
+
+Also confirm the S3 endpoint is trusted from a running Manage server-bundle pod:
 
 ```bash
 export MANAGE_POD=<ui-or-cron-server-bundle-pod>
@@ -162,88 +160,61 @@ oc exec -n "$MANAGE_NS" "$MANAGE_POD" -- bash -c \
   | grep -i 'verify return code'"
 ```
 
-The expected result is `0 (ok)`.
+Expected TLS result: `0 (ok)`.
 
-### 6. Migrate and validate
+### 4. Migrate and validate
 
-Use IBM's supported file-to-S3 conversion process. Copying files directly to the
-bucket is not sufficient by itself because the database metadata and S3 object
-keys must remain consistent.
+Use IBM's supported `file2s3.sh` conversion tool from a Manage admin or maxinst
+pod that can still access `/doclinks`. Copying files directly into the bucket is
+not sufficient because the database metadata and S3 object keys must agree.
 
 After conversion:
 
 1. Compare source file count and total size with the converted object set.
 2. Compare checksums for the recorded test files.
-3. Open existing attachments from Work Orders, Assets, and Locations.
-4. Upload, download, and delete new attachments.
-5. Test from each server-bundle type that handles attachment requests.
-6. Review server-bundle logs for S3, TLS, integrity, and authorization errors.
+3. Open migrated attachments from Work Orders, Assets, and Locations.
+4. Upload, download, and delete new S3-backed attachments.
+5. Review all server-bundle logs for S3, TLS, integrity, and authorization errors.
 
-If migrated objects retain nested folder paths such as `attachments/` or
-`diagrams/`, verify whether `mxe.cosnestedfile=1` is required for the installed
-Manage version.
+### 5. Complete the migration
 
-### 7. Complete the migration
-
-After the acceptance checks and rollback window are complete:
+After acceptance and the rollback window, set:
 
 ```text
 MANAGE_ATTACHMENT_PROVIDER=s3
 ```
 
-Render, commit, and synchronize again. Confirm the legacy `/doclinks` PVC is no
-longer mounted before scheduling its separate retention and removal process.
-Do not delete the old data as part of the same change that enables S3.
+Render, commit, and synchronize. Confirm `/doclinks` is no longer mounted before
+scheduling the old PVC for separate retention and removal. Do not delete the NFS
+data in the same change that removes the mount.
 
-## Runtime properties
+## Verify the nonfunctional 8.7.24 CR field is absent
 
-The Manage operator derives the provider properties from the custom resource and
-adds them to the server-bundle configuration. They might not appear as newly
-updated rows in `MAXPROPVALUE`.
+The following command prints the stored `s3Url` only when the block that is
+nonfunctional in this 8.7.24 deployment is still present:
 
-| Property | Source |
-|---|---|
-| `mxe.attachmentstorage` | `providerSourceType: s3` |
-| `mxe.cosendpointuri` | Vault `endpoint` through `s3Url` |
-| `mxe.cosbucketname` | Vault `bucket` |
-| `mxe.cosaccesskey` | Vault `access_key` |
-| `mxe.cossecretkey` | Kubernetes Secret `accessSecretKey` |
-| `mxe.doclink.securedAttachment` | Verify separately; it must be `true` |
+```bash
+oc get manageworkspace "$MANAGEWORKSPACE" -n "$MANAGE_NS" \
+  -o jsonpath='{.spec.settings.db.attachmentProvider.s3.providerCredentials.s3Url}{"\n"}'
+```
 
-The provider custom resource does not update the `DOCTYPES` table. Validate the
-existing document folder paths as part of migration testing.
+After the corrected GitOps manifest synchronizes, this command should print a
+blank line for S3 modes. For file storage, `attachmentProvider.filestorage`
+remains valid.
 
-## Troubleshooting
+To inspect what the installed CRD accepts:
 
-| Symptom | Cause | Resolution |
-|---|---|---|
-| CRD reports `providerCredentials.s3Url: Required value` | Template uses unsupported `cosAwsUrl` | Render `s3Url` |
-| ManageWorkspace reports that the S3 Secret is missing | Secret was not created in the Manage namespace, or its name/key does not match | Create `<workspace>-manage-s3-secret` with key `accessSecretKey` |
-| TLS error names `<bucket>.<endpoint>` | Missing CA trust or wildcard SAN | Import the CA chain and add `*.<endpoint>` to the endpoint certificate |
-| `InvalidBucketName` | OneFS virtual-hosted addressing is not configured | Set the OneFS base domain, wildcard subdomains, and wildcard DNS |
-| `Unable to verify integrity of data upload` | OneFS returns a non-MD5 ETag | Enable `use-md5-for-etag` on the OneFS access zone |
-| `403 AccessDenied` | Bucket or filesystem ACL is incomplete | Verify both OneFS filesystem permissions and bucket ACL |
-| Migrated attachment is listed but cannot be opened | Object key/path does not match metadata | Validate conversion output and `mxe.cosnestedfile` |
+```bash
+oc explain manageworkspace.spec.settings.db.attachmentProvider.s3.providerCredentials \
+  --api-version=apps.mas.ibm.com/v1
+```
 
-Prefer fixing the OneFS ETag behavior. The JVM option
-`-Dcom.amazonaws.services.s3.disablePutObjectMD5Validation=true` disables an
-integrity check and should be used only as a documented exception.
-
-## Production operations
-
-- Back up the Manage database and PowerScale attachment data to the same recovery
-  point. A mismatched restore creates dangling database links or orphaned objects.
-- Rotate the PowerScale S3 key through change control. Update Vault and the
-  manually managed Kubernetes Secret, reconcile Manage, and verify all server
-  bundles before retiring the old credential.
-- Monitor endpoint certificate expiry, S3 service health, bucket capacity and
-  object count, failed attachment operations, and orphaned objects.
-- Test upload, download, restore, and migrated attachment retrieval after Manage
-  upgrades or PowerScale changes.
-- Keep migration evidence and acceptance results with the implementation ticket.
+Schema acceptance alone is not runtime verification. Confirm the nine system
+properties and complete an upload/download test.
 
 ## References
 
-- [IBM: Configure attachments with the ManageWorkspace custom resource](https://www.ibm.com/docs/en/masv-and-l/maximo-manage/cd?topic=documents-configuring-attachments-by-using-manageworkspace-custom-resource)
+- [IBM: S3 attachment properties](https://www.ibm.com/docs/en/masv-and-l/maximo-manage/cd?topic=properties-attachment-s3)
 - [IBM: Convert file-based storage to S3](https://www.ibm.com/docs/en/masv-and-l/maximo-manage/cd?topic=storage-converting-file-based-s3)
+- [IBM MAS DevOps: Manage attachment configuration](https://ibm-mas.github.io/ansible-devops/roles/suite_manage_attachments_config/)
 - [PowerScale S3 setup](./powerscale-s3-onefs-setup.md)

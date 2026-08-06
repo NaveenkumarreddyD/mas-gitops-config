@@ -132,10 +132,10 @@ Provide these values through the approved secret-transfer process:
 
 | Value | Purpose |
 |---|---|
-| Endpoint | `ManageWorkspace` `s3Url` |
+| Endpoint | Manage `mxe.cosendpointuri` system property |
 | Bucket name | Attachment destination |
-| Access key | S3 identity |
-| Secret key | S3 credential secret |
+| Access key | Manage `mxe.cosaccesskey` encrypted system property |
+| Secret key | Manage `mxe.cossecretkey` encrypted system property |
 | SubCA PEM | Manage imported certificate chain |
 | Root CA PEM | Manage imported certificate chain |
 

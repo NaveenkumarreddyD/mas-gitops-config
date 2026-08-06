@@ -31,13 +31,12 @@ Lines like `"<path:secret/data/<acct>/<cluster>/<inst>/manage-crypto#cryptoKey>"
   admin superuser into Vault for reproducibility.
 - **Attachment storage is selected by `MANAGE_ATTACHMENT_PROVIDER`:**
   - `filestorage` renders IBM's file provider and an RWX PVC mounted at `/doclinks`.
-  - `s3-migration` renders IBM's S3 provider and imported PowerScale CAs while retaining `/doclinks`
-    for migration validation and rollback.
-  - `s3` renders the same S3 configuration without the legacy `/doclinks` PVC.
+  - `s3-migration` imports the PowerScale CAs and retains `/doclinks` for migration and rollback.
+  - `s3` imports the same CAs without the legacy `/doclinks` PVC.
   - Unset preserves legacy behavior and renders no attachment-provider override.
-  The S3 endpoint, bucket, access key, and CA chain come from Vault `manage-cos`; Git contains
-  references only. IBM requires the S3 secret key in a separately created Kubernetes Secret with
-  key `accessSecretKey`. This Secret is manual until external-secrets automation is available.
+  Manage 8.7.24 does not materialize the S3 `attachmentProvider` fields into runtime properties.
+  Configure the nine required `mxe.*` S3 properties manually as documented in
+  `docs/manage-attachments-powerscale-s3.md`. The CA chain comes from Vault `manage-cos`.
 
 ## Per-env overrides (no env-file bloat)
 Use `${VAR:-default}` so the template carries a default and an env sets the var only to override:

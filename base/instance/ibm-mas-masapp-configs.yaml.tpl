@@ -70,17 +70,6 @@ ibm_mas_masapp_configs:
             filestorage:
               defpath: ${MANAGE_DOCLINKS_PATH:-/doclinks}
 {{END_IF}}
-{{IF_IN MANAGE_ATTACHMENT_PROVIDER s3-migration,s3}}
-          attachmentProvider:
-            providerSourceType: s3
-            s3:
-              providerCredentials:
-                s3Url: "<path:secret/data/${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/manage-cos#endpoint>"
-                bucketName: "<path:secret/data/${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/manage-cos#bucket>"
-                accessKey: "<path:secret/data/${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/manage-cos#access_key>"
-                secretKey:
-                  secretName: ${WORKSPACE_ID}-manage-s3-secret
-{{END_IF}}
           maxinst:
             tableSpace: ${DB_TABLESPACE}
             indexSpace: ${DB_INDEXSPACE}
