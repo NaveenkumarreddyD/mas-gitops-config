@@ -40,6 +40,10 @@ ibm_mas_masapp_configs:
       MXE_SECURITY_CRYPTO_KEY: "<path:secret/data/${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/manage-crypto#cryptoKey>"
       MXE_SECURITY_CRYPTOX_KEY: "<path:secret/data/${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/manage-crypto#cryptoxKey>"
 {{END_IF}}
+{{IF_IN MANAGE_ATTACHMENT_PROVIDER s3-migration,s3}}
+    manage_attachment_s3_secret_name: ${WORKSPACE_ID}-manage-s3-secret
+    manage_attachment_s3_access_secret_key: "<path:secret/data/${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/manage-cos#secret_key>"
+{{END_IF}}
 
     mas_appws_spec:
       bindings:
@@ -65,6 +69,23 @@ ibm_mas_masapp_configs:
         db:
           dbSchema: ${DB_SCHEMA}
           encryptionSecret: ${WORKSPACE_ID}-manage-encryptionsecret
+{{IF_IN MANAGE_ATTACHMENT_PROVIDER filestorage}}
+          attachmentProvider:
+            providerSourceType: filestorage
+            filestorage:
+              defpath: ${MANAGE_DOCLINKS_PATH:-/doclinks}
+{{END_IF}}
+{{IF_IN MANAGE_ATTACHMENT_PROVIDER s3-migration,s3}}
+          attachmentProvider:
+            providerSourceType: s3
+            s3:
+              providerCredentials:
+                cosAwsUrl: "<path:secret/data/${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/manage-cos#endpoint>"
+                bucketName: "<path:secret/data/${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/manage-cos#bucket>"
+                accessKey: "<path:secret/data/${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/manage-cos#access_key>"
+                secretKey:
+                  secretName: ${WORKSPACE_ID}-manage-s3-secret
+{{END_IF}}
           maxinst:
             tableSpace: ${DB_TABLESPACE}
             indexSpace: ${DB_INDEXSPACE}
@@ -85,9 +106,21 @@ ibm_mas_masapp_configs:
           autoGenerateEncryptionKeys: ${MANAGE_AUTO_GENERATE_ENCRYPTION_KEYS}
           defaultJMS: false
           serverTimezone: ${SERVER_TIMEZONE}
+{{IF_IN MANAGE_ATTACHMENT_PROVIDER s3-migration,s3}}
+          importedCerts:
+            - alias: powerscale-s3-subca
+              crt: |
+                <path:secret/data/${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/manage-cos#powerscale_s3_subca>
+            - alias: powerscale-s3-rootca
+              crt: |
+                <path:secret/data/${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/manage-cos#powerscale_s3_rootca>
+{{END_IF}}
           persistentVolumes:
             - { pvcName: jmsstore,  mountPath: /jmsstore,  size: ${MANAGE_JMSSTORE_SIZE:-20Gi},  storageClassName: ${RWX_STORAGE_CLASS}, accessModes: [ReadWriteMany] }
             - { pvcName: globaldir, mountPath: /globaldir, size: ${MANAGE_GLOBALDIR_SIZE:-20Gi}, storageClassName: ${RWX_STORAGE_CLASS}, accessModes: [ReadWriteMany] }
+{{IF_IN MANAGE_ATTACHMENT_PROVIDER filestorage,s3-migration}}
+            - { pvcName: doclinks, mountPath: ${MANAGE_DOCLINKS_PATH:-/doclinks}, size: ${MANAGE_DOCLINKS_SIZE:-100Gi}, storageClassName: ${RWX_STORAGE_CLASS}, accessModes: [ReadWriteMany] }
+{{END_IF}}
           serverBundles:
             - name: ui
               bundleType: ui

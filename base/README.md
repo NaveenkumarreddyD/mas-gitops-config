@@ -29,14 +29,21 @@ Lines like `"<path:secret/data/<acct>/<cluster>/<inst>/manage-crypto#cryptoKey>"
   Reused DB / prod → set `false` and provide the original keys (`ALLOW_CUSTOM_MANAGE_CRYPTO_KEYS=true`).
   Fresh DB → `true`. After install, `scripts/backup-manage-secrets.sh` backs up the live crypto keys +
   admin superuser into Vault for reproducibility.
-- **Attachments use external storage** → no `/DOCLINKS` PVC. Only `jmsstore` (JMS persistence) and
-  `globaldir` (shared dir) need local RWX volumes. If you switch to a mounted external share for
-  attachments, add a `persistentVolumes` entry pointing at it.
+- **Attachment storage is selected by `MANAGE_ATTACHMENT_PROVIDER`:**
+  - `filestorage` renders IBM's file provider and an RWX PVC mounted at `/doclinks`.
+  - `s3-migration` renders IBM's S3 provider and imported PowerScale CAs while retaining `/doclinks`
+    for migration validation and rollback.
+  - `s3` renders the same S3 configuration without the legacy `/doclinks` PVC.
+  - Unset preserves legacy behavior and renders no attachment-provider override.
+  S3 values come from Vault `manage-cos`; Git contains references only. IBM requires the S3 secret
+  key in a Kubernetes Secret with key `accessSecretKey`, created by the application config chart.
 
 ## Per-env overrides (no env-file bloat)
 Use `${VAR:-default}` so the template carries a default and an env sets the var only to override:
 - `MANAGE_JMSSTORE_SIZE` / `MANAGE_GLOBALDIR_SIZE` — PVC sizes (default `20Gi`). PVCs can grow
   (StorageClass must allow expansion) but **cannot shrink**.
+- `MANAGE_DOCLINKS_PATH` / `MANAGE_DOCLINKS_SIZE` — file attachment mount and size (defaults
+  `/doclinks` and `100Gi`); used only by `filestorage` and `s3-migration`.
 
 ## Admin login
 The MAS admin user is the **operator-generated** secret `${INSTANCE_ID}-credentials-superuser` in the

@@ -1,24 +1,28 @@
 # Manage attachments on PowerScale (OneFS) S3
 
 Configure Maximo Manage "attached documents" (doclinks) to store files in Dell
-PowerScale (OneFS) S3 instead of a `/DOCLINKS` PVC or NFS share, for the
-`drroc4` / `drrocapp` instance.
+PowerScale (OneFS) S3 instead of a `/doclinks` PVC or NFS share. The shared
+instance template supports filesystem, migration, and S3-only modes.
 
 ## What this is (and is NOT)
 
-- Manage attachments on S3 are driven by **Maximo system properties**
-  (`mxe.cos*`) stored in the Manage database (`MAXPROPVALUE`). They are **not** a
-  MAS custom resource, so **GitOps cannot own them declaratively** — this is an
-  imperative step, like the SLS/DRO registration harvest.
+- GitOps owns the selected attachment provider through
+  `ManageWorkspace.spec.settings.db.attachmentProvider`.
+- `MANAGE_ATTACHMENT_PROVIDER=filestorage` configures `/doclinks` and mounts the
+  RWX PVC. `s3-migration` configures S3 while retaining that PVC for migration
+  verification or rollback. `s3` configures S3 without the legacy PVC.
+- The S3 access secret is rendered as a Kubernetes Secret containing the IBM
+  required `accessSecretKey` field. The endpoint, bucket, access key, secret key,
+  and CA chain remain in Vault and are resolved by Argo CD Vault Plugin.
 - The MAS **`ObjectStorageCfg` / `coscfgs` CR** (the `130-ibm-objectstorage-config`
   chart) is the MAS **platform** object-storage config used by other MAS apps. It
   does **not** configure Manage attachments. Do not wire it up for this.
 - PowerScale OneFS S3 is just an S3-compatible endpoint (HTTPS on **port 9021**
   by default), so Manage's `COSAttachmentStorage` provider talks to it the same
   way it talks to AWS/IBM COS — you point `mxe.cosendpointuri` at PowerScale.
-- IBM's `suite_manage_attachments_config` Ansible role does not provide a clean
-  custom PowerScale endpoint path for this design, so the Manage properties are
-  applied manually and tested before migration.
+- The PowerScale SubCA and Root CA are supplied through
+  `ManageWorkspace.spec.settings.deployment.importedCerts` so the Manage server
+  bundles trust the private S3 endpoint.
 
 ## The properties
 
@@ -44,7 +48,8 @@ PowerScale (OneFS) S3 instead of a `/DOCLINKS` PVC or NFS share, for the
 
 ### 2. Store the handoff values in Vault
 
-Using the Vault UI, create `secret/drroc4/drroc4/drrocapp/manage-cos` with:
+Using the Vault UI, create
+`secret/<account>/<cluster>/<instance>/manage-cos` with:
 
 | Field | Value |
 |---|---|
@@ -52,9 +57,11 @@ Using the Vault UI, create `secret/drroc4/drroc4/drrocapp/manage-cos` with:
 | `bucket` | `dr-maximo-bckt` |
 | `access_key` | OneFS S3 access key |
 | `secret_key` | OneFS S3 secret key |
-| `ca.crt` | Raw endpoint CA PEM |
+| `powerscale_s3_subca` | Raw SubCA PEM, including BEGIN/END lines |
+| `powerscale_s3_rootca` | Raw Root CA PEM, including BEGIN/END lines |
 
-This path is a secure operator handoff; no chart reads it automatically.
+The shared template reads these fields through Argo CD Vault Plugin. Do not put
+the secret values in an `.env` file or commit them to Git.
 
 ### 3. Preflight
 
@@ -71,28 +78,28 @@ The expected result is `0 (ok)`.
 ### 4. Certificate trust — the most-missed step
 Because :9021 is HTTPS with an internal CA, the Manage Liberty JVM must **trust
 the PowerScale S3 CA** or every attachment call fails with a TLS handshake error
-(the preflight in step 3 detects this). There is **no verified declarative
-`certificates:` field on the `ManageWorkspace` CR** for an arbitrary external CA
-in the 8.7.x line — do not add one blind. Use one of:
-- Have OneFS present a cert signed by an internal CA that Manage already trusts
-  (e.g. your Spire chain), if feasible; **or**
-- Add the OneFS S3 CA to the Manage truststore via the mechanism supported by
-  your exact MAS Manage build — **verify the field/secret against your
-  `manageworkspaces.apps.mas.ibm.com` CRD before applying**
-  (`oc explain manageworkspace.spec.settings --recursive | grep -i cert`).
-Re-run step 3 until it reports **PASS**.
+(the preflight in step 3 detects this). The S3 modes render the Vault SubCA and
+Root CA into `ManageWorkspace.spec.settings.deployment.importedCerts`. After the
+workspace reconciles, verify the imported aliases and rerun step 3 until the TLS
+verification reports `0 (ok)`.
 
-### 5. Apply the properties (encryption-safe)
-`mxe.cosaccesskey` / `mxe.cossecretkey` are **encrypted** properties — a raw SQL
-`UPDATE` writes plaintext that Maximo cannot decrypt. Set them via a path that
-encrypts on write:
-- **Manage admin UI** (recommended): System Configuration → Platform
-  Configuration → System Properties → set each value → **Live Refresh**. Take the
-  key values from Vault `secret/drroc4/drroc4/drrocapp/manage-cos`.
-- **Maximo REST API**: same properties + a live refresh, using the superuser
-  credential from the operator-generated secret `drrocapp-credentials-superuser`
-  in the `mas-drrocapp-core` namespace.
-- Set the non-encrypted properties through the same Manage UI and perform a Live Refresh.
+### 5. Select and render the provider
+
+For the initial filesystem test:
+
+```text
+MANAGE_ATTACHMENT_PROVIDER=filestorage
+MANAGE_DOCLINKS_PATH=/doclinks
+MANAGE_DOCLINKS_SIZE=100Gi
+```
+
+After the test attachments exist and the Vault S3 values are ready, use
+`MANAGE_ATTACHMENT_PROVIDER=s3-migration`. This changes the active provider to
+S3 while retaining the legacy PVC. After migration and acceptance checks are
+complete, use `MANAGE_ATTACHMENT_PROVIDER=s3` to stop mounting the legacy PVC.
+
+Run `./render.sh <environment>` and commit the rendered environment. Argo CD
+then creates the S3 credential Secret and reconciles the `ManageWorkspace`.
 
 ### 6. Verify
 Create an attachment on any record; confirm the object appears in the
@@ -108,11 +115,8 @@ are **not** migrated automatically — plan a separate copy/migration if needed.
   that your Manage build's COS client honours it. This is the most likely thing
   to bite during step 6.
 - **`securedAttachment` must be `true`** or the S3 provider is bypassed.
-- **`global_secrets` will NOT carry these.** The Manage operator only maps a
-  whitelisted set of `MXE_*` env vars (the crypto keys) into system properties;
-  arbitrary `mxe.cos*` env vars are not applied, and camelCase
-  `mxe.doclink.securedAttachment` can't be represented as an uppercase env var.
-  Use MAXPROPVALUE / UI / API, not `global_secrets`.
+- **Do not use `global_secrets` for the S3 credentials.** The chart creates the
+  dedicated Secret shape expected by `attachmentProvider.s3.secretKey`.
 - **Version check.** Confirm the exact property list for the Manage 8.7.x channel
   in IBM docs before applying — property names have been stable but verify.
 

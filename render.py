@@ -30,6 +30,11 @@ IF_TRUE = re.compile(r"^[ \t]*\{\{IF_TRUE ([A-Z0-9_]+)\}\}[ \t]*\n(.*?)\n[ \t]*\
 # per-bundle server.xml base64 that renders its Secret + additionalServerConfig only when supplied;
 # left empty, the bundle falls back to the Manage operator default.
 IF_SET = re.compile(r"^[ \t]*\{\{IF_SET ([A-Z0-9_]+)\}\}[ \t]*\n(.*?)\n[ \t]*\{\{END_IF\}\}[ \t]*\n", re.DOTALL | re.MULTILINE)
+# {{IF_IN VAR value1,value2}} keeps its body when VAR exactly matches one of the listed values.
+# This is intended for small enum-style settings where a boolean would hide meaningful states.
+IF_IN = re.compile(r"^[ \t]*\{\{IF_IN ([A-Z0-9_]+) ([A-Za-z0-9_.-]+(?:,[A-Za-z0-9_.-]+)*)\}\}[ \t]*\n(.*?)\n[ \t]*\{\{END_IF\}\}[ \t]*\n", re.DOTALL | re.MULTILINE)
+
+ATTACHMENT_PROVIDERS = {"filestorage", "s3-migration", "s3"}
 
 # Fully declarative: every cluster/instance config + app renders for every cluster. There are NO
 # ENABLE_* staging toggles. Runtime-dependent configs (SLSCfg/BASCfg) simply sit Degraded until
@@ -48,6 +53,12 @@ def load_env(path):
     return env
 
 def strip_conditionals(text, env):
+    # Enum selector used by the attachment backend: file storage, S3 with the legacy PVC retained,
+    # or final S3-only operation.
+    text = IF_IN.sub(
+        lambda m: m.group(3) + "\n" if env.get(m.group(1), "").strip() in m.group(2).split(",") else "",
+        text,
+    )
     # {{IF_SET VAR}} keeps its body only when VAR has a non-empty value (opt-in when passed).
     text = IF_SET.sub(lambda m: m.group(2) + "\n" if env.get(m.group(1), "").strip() else "", text)
     # {{IF_TRUE VAR}} keeps its body only when VAR is truthy; {{IF_FALSE VAR}} only when it is NOT.
@@ -87,6 +98,10 @@ def render_one(name):
     envfile = os.path.join(HERE, "envs", f"{name}.env")
     if not os.path.exists(envfile): sys.exit(f"no env file: {envfile}")
     env = load_env(envfile); cid, iid = env["CLUSTER_ID"], env["INSTANCE_ID"]
+    attachment_provider = env.get("MANAGE_ATTACHMENT_PROVIDER", "").strip()
+    if attachment_provider and attachment_provider not in ATTACHMENT_PROVIDERS:
+        supported = ", ".join(sorted(ATTACHMENT_PROVIDERS))
+        sys.exit(f"ERROR: {envfile}: MANAGE_ATTACHMENT_PROVIDER must be one of: {supported}")
     # Top-level output dir is the ACCOUNT_ID, not a literal "mas". Per-env accounts
     # (e.g. roc4, doc4) render under their own account dir so each cluster's ArgoCD
     # Account Root App globs only its own subtree ("<account>/*/..."). account=mas
