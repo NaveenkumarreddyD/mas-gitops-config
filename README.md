@@ -39,7 +39,12 @@ IBM's account root reads:
 - `<account>/<cluster>/*.yaml` — cluster-scoped configuration.
 - `<account>/<cluster>/<instance>/*.yaml` — instance-scoped configuration.
 
-Secrets are references only: AVP resolves `<path:secret/data/<account>/<cluster>/…>` from Vault at
-sync time. Never commit secret values.
+Secrets are references only: the Argo CD plugin resolves
+`<path:mas/<account>/<cluster>/...>` from AWS Secrets Manager at sync time. Never commit
+secret values or AWS credentials.
+
+The IBM 8.4.2 static-key SLS/DRO write-back Jobs are disabled in these values. The
+platform repository deploys an automatic IAM Roles Anywhere publisher for the generated
+`dro` and `sls` secrets; no operator publish step is required.
 
 The end-to-end installation procedure is in the platform repository's `INSTALL.md`.

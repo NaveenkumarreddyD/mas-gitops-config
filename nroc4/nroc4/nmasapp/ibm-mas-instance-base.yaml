@@ -14,8 +14,8 @@ cluster:
 instance:
   id: nmasapp
 
-# Required by IBM 8.4.0 instance-root templates (unconditional .Values.sm.* references).
-# Empty on the Vault patch — the patched jobs write to Vault, not AWS SM.
+# Required by the official IBM 8.4.2 instance-root templates. These stay empty; the
+# Roles Anywhere publisher handles write-back.
 sm:
   aws_access_key_id: ""
   aws_secret_access_key: ""

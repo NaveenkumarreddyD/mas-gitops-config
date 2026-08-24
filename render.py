@@ -17,7 +17,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 # per-env-overridable values (e.g. PVC sizes, replicas) without forcing every env to declare them.
 VAR = re.compile(r"\$\{([A-Z0-9_]+)(?::-([^}]*))?\}")
 # Conditional block: {{IF_FALSE VAR}} ... {{END_IF}} renders the body ONLY when env[VAR] is NOT
-# truthy. Used for mutually-exclusive config — e.g. omit the global_secrets crypto Vault path when
+# truthy. Used for mutually-exclusive config - e.g. omit the global_secrets crypto secret when
 # MANAGE_AUTO_GENERATE_ENCRYPTION_KEYS=true (MAS generates its own keys, so providing them is
 # redundant and would add an unwanted AVP dependency on the manage-crypto secret).
 IF_FALSE = re.compile(r"^[ \t]*\{\{IF_FALSE ([A-Z0-9_]+)\}\}[ \t]*\n(.*?)\n[ \t]*\{\{END_IF\}\}[ \t]*\n", re.DOTALL | re.MULTILINE)
@@ -38,7 +38,7 @@ ATTACHMENT_PROVIDERS = {"filestorage", "s3-migration", "s3"}
 
 # Fully declarative: every cluster/instance config + app renders for every cluster. There are NO
 # ENABLE_* staging toggles. Runtime-dependent configs (SLSCfg/BASCfg) simply sit Degraded until
-# their registration is harvested into Vault, then converge. The only things that suppress a file
+# their registration is stored in AWS Secrets Manager, then converge. The only things that suppress a file
 # are GITOPS_OWNS_CERT_MANAGER (environmental: don't install cert-manager if the cluster has it)
 # and SHARED_CLUSTER_SKIP (low-level override).
 
@@ -132,7 +132,7 @@ def render_one(name):
               render(open(os.path.join(HERE, "base", "instance", tpl)).read(), env, tpl))
     all_skipped = skipped
     note = f"  (skipped {', '.join(all_skipped)})" if all_skipped else ""
-    print(f"Rendered {name} -> {acct}/{cid}/{note}  (secret values remain in Vault)")
+    print(f"Rendered {name} -> {acct}/{cid}/{note}  (secret values remain in AWS Secrets Manager)")
 
 def main():
     if len(sys.argv) != 2: sys.exit("usage: python3 render.py <cluster>|--all")

@@ -6,7 +6,7 @@ PowerScale NFS to PowerScale S3. PowerScale provisioning is documented in
 
 ## Supported configuration for 8.7.24
 
-IBM GitOps 8.4.0 passes `mas_appws_spec` directly into the `ManageWorkspace`
+IBM GitOps 8.4.2 passes `mas_appws_spec` directly into the `ManageWorkspace`
 custom resource. It does not translate attachment settings into Maximo system
 properties.
 
@@ -41,15 +41,15 @@ Use `s3-migration` until conversion, validation, and the rollback window are
 complete. Changing to `s3` removes the mount from the Manage pod specification;
 it does not delete the PVC or its data.
 
-## Vault contract
+## AWS Secrets Manager contract
 
 Keep the PowerScale values at:
 
 ```text
-secret/<account>/<cluster>/<instance>/manage-cos
+mas/<account>/<cluster>/<instance>/manage-cos
 ```
 
-| Vault field | Use |
+| JSON field | Use |
 |---|---|
 | `endpoint` | `mxe.cosendpointuri` |
 | `bucket` | `mxe.cosbucketname` |
@@ -58,10 +58,10 @@ secret/<account>/<cluster>/<instance>/manage-cos
 | `powerscale_s3_subca` | Manage imported certificate |
 | `powerscale_s3_rootca` | Manage imported certificate |
 
-Argo CD Vault Plugin resolves only the two CA certificates into
-`settings.deployment.importedCerts`. Until an approved external-secrets or API
-integration is available, enter the four S3 connection values manually in
-Manage. Do not commit them to Git or place them in `bundleLevelProperties`.
+The Argo CD secret plugin resolves only the two CA certificates into
+`settings.deployment.importedCerts`. Enter the four S3 connection values from the
+approved AWS secret through the Manage UI or API. Do not commit them to Git or
+place them in `bundleLevelProperties`.
 
 ## Required Manage properties
 
@@ -93,7 +93,7 @@ property is confirmed to support Live Refresh.
 ### 1. Prepare and baseline
 
 1. Complete the [PowerScale S3 setup](./powerscale-s3-onefs-setup.md).
-2. Confirm all six Vault fields exist.
+2. Confirm all six AWS secret fields exist.
 3. Create a known set of NFS-backed test attachments and record their database
    IDs, record types, filenames, sizes, and checksums.
 4. Take a coordinated database backup and `/doclinks` snapshot.

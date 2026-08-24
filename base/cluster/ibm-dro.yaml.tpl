@@ -2,13 +2,13 @@ merge-key: "${ACCOUNT_ID}/${CLUSTER_ID}"
 
 ibm_dro:
   dro_namespace: ${DRO_NAMESPACE}
-  ibm_entitlement_key: "<path:secret/data/${ACCOUNT_ID}/${CLUSTER_ID}/entitlement#image_pull_secret_b64>"
+  ibm_entitlement_key: "<path:mas/${ACCOUNT_ID}/${CLUSTER_ID}/entitlement#image_pull_secret_b64>"
   dro_install_plan: Automatic
   imo_install_plan: Automatic
-  run_sync_hooks: true
-  vault_addr: "http://vault-active.vault.svc.cluster.local:8200"
-  vault_writer_role: "mas-gitops-writer"
-  vault_kv_mount: "secret"
+  # The IBM 8.4.2 hook accepts static AWS keys. The platform publisher replaces only
+  # that write-back step and publishes DRO automatically with IAM Roles Anywhere.
+  run_sync_hooks: false
 sm:
+  # Kept empty because the official IBM root chart reads these keys at render time.
   aws_access_key_id: ""
   aws_secret_access_key: ""

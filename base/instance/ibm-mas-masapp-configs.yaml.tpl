@@ -37,8 +37,8 @@ ibm_mas_masapp_configs:
 {{END_IF}}
 {{IF_FALSE MANAGE_AUTO_GENERATE_ENCRYPTION_KEYS}}
     global_secrets:
-      MXE_SECURITY_CRYPTO_KEY: "<path:secret/data/${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/manage-crypto#cryptoKey>"
-      MXE_SECURITY_CRYPTOX_KEY: "<path:secret/data/${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/manage-crypto#cryptoxKey>"
+      MXE_SECURITY_CRYPTO_KEY: "<path:mas/${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/manage-crypto#cryptoKey>"
+      MXE_SECURITY_CRYPTOX_KEY: "<path:mas/${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/manage-crypto#cryptoxKey>"
 {{END_IF}}
     mas_appws_spec:
       bindings:
@@ -94,10 +94,10 @@ ibm_mas_masapp_configs:
           importedCerts:
             - alias: powerscale-s3-subca
               crt: |
-                <path:secret/data/${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/manage-cos#powerscale_s3_subca>
+                <path:mas/${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/manage-cos#powerscale_s3_subca>
             - alias: powerscale-s3-rootca
               crt: |
-                <path:secret/data/${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/manage-cos#powerscale_s3_rootca>
+                <path:mas/${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/manage-cos#powerscale_s3_rootca>
 {{END_IF}}
           persistentVolumes:
             - { pvcName: jmsstore,  mountPath: /jmsstore,  size: ${MANAGE_JMSSTORE_SIZE:-20Gi},  storageClassName: ${RWX_STORAGE_CLASS}, accessModes: [ReadWriteMany] }
