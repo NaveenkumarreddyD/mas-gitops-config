@@ -46,10 +46,6 @@ ibm_mas_masapp_configs:
         db:
           dbSchema: maximo
           encryptionSecret: drgitopswks-manage-encryptionsecret
-          attachmentProvider:
-            providerSourceType: filestorage
-            filestorage:
-              defpath: /doclinks
           maxinst:
             tableSpace: MAX_DATA
             indexSpace: MAX_INDEX
@@ -70,6 +66,13 @@ ibm_mas_masapp_configs:
           autoGenerateEncryptionKeys: true
           defaultJMS: false
           serverTimezone: America/Chicago
+          importedCerts:
+            - alias: powerscale-s3-subca
+              crt: |
+                <path:mas/drroc4/drroc4/drgitopsapp/manage-cos#powerscale_s3_subca>
+            - alias: powerscale-s3-rootca
+              crt: |
+                <path:mas/drroc4/drroc4/drgitopsapp/manage-cos#powerscale_s3_rootca>
           persistentVolumes:
             - { pvcName: jmsstore,  mountPath: /jmsstore,  size: 20Gi,  storageClassName: isilon, accessModes: [ReadWriteMany] }
             - { pvcName: globaldir, mountPath: /globaldir, size: 20Gi, storageClassName: isilon, accessModes: [ReadWriteMany] }
