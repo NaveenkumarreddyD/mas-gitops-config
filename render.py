@@ -1,9 +1,8 @@
-
 #!/usr/bin/env python3
 """Render MAS GitOps config from base/ templates + envs/<cluster>.env.
 
 IBM-aligned (hub-and-spoke): ONE config repo branch holds EVERY cluster directory.
-Output is written to ./mas/<CLUSTER_ID>/...  at the repo root - exactly what the single
+Output is written to ./<ACCOUNT_ID>/<CLUSTER_ID>/... at the repo root - exactly what the single
 Account Root Application's cluster ApplicationSet globs (<account>/*/...).
 
 Usage:
@@ -18,7 +17,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 # per-env-overridable values (e.g. PVC sizes, replicas) without forcing every env to declare them.
 VAR = re.compile(r"\$\{([A-Z0-9_]+)(?::-([^}]*))?\}")
 # Conditional block: {{IF_FALSE VAR}} ... {{END_IF}} renders the body ONLY when env[VAR] is NOT
-# truthy. Used for mutually-exclusive config — e.g. omit the global_secrets crypto Vault path when
+# truthy. Used for mutually-exclusive config - e.g. omit the global_secrets crypto secret when
 # MANAGE_AUTO_GENERATE_ENCRYPTION_KEYS=true (MAS generates its own keys, so providing them is
 # redundant and would add an unwanted AVP dependency on the manage-crypto secret).
 IF_FALSE = re.compile(r"^[ \t]*\{\{IF_FALSE ([A-Z0-9_]+)\}\}[ \t]*\n(.*?)\n[ \t]*\{\{END_IF\}\}[ \t]*\n", re.DOTALL | re.MULTILINE)
@@ -26,10 +25,20 @@ IF_FALSE = re.compile(r"^[ \t]*\{\{IF_FALSE ([A-Z0-9_]+)\}\}[ \t]*\n(.*?)\n[ \t]
 # IF_FALSE). Used e.g. to include the manual tls_cert/tls_key/ca_cert lines only when
 # MAS_MANUAL_CERT_MGMT=true; when false, MAS auto-generates a self-signed core cert.
 IF_TRUE = re.compile(r"^[ \t]*\{\{IF_TRUE ([A-Z0-9_]+)\}\}[ \t]*\n(.*?)\n[ \t]*\{\{END_IF\}\}[ \t]*\n", re.DOTALL | re.MULTILINE)
+# {{IF_SET VAR}} ... {{END_IF}} renders the body ONLY when env[VAR] has a non-empty value. Unlike
+# IF_TRUE (which needs a boolean 1/true/yes), this is "opt-in when a value is passed" — e.g. a
+# per-bundle server.xml base64 that renders its Secret + additionalServerConfig only when supplied;
+# left empty, the bundle falls back to the Manage operator default.
+IF_SET = re.compile(r"^[ \t]*\{\{IF_SET ([A-Z0-9_]+)\}\}[ \t]*\n(.*?)\n[ \t]*\{\{END_IF\}\}[ \t]*\n", re.DOTALL | re.MULTILINE)
+# {{IF_IN VAR value1,value2}} keeps its body when VAR exactly matches one of the listed values.
+# This is intended for small enum-style settings where a boolean would hide meaningful states.
+IF_IN = re.compile(r"^[ \t]*\{\{IF_IN ([A-Z0-9_]+) ([A-Za-z0-9_.-]+(?:,[A-Za-z0-9_.-]+)*)\}\}[ \t]*\n(.*?)\n[ \t]*\{\{END_IF\}\}[ \t]*\n", re.DOTALL | re.MULTILINE)
+
+ATTACHMENT_PROVIDERS = {"filestorage", "s3-migration", "s3"}
 
 # Fully declarative: every cluster/instance config + app renders for every cluster. There are NO
 # ENABLE_* staging toggles. Runtime-dependent configs (SLSCfg/BASCfg) simply sit Degraded until
-# their registration is harvested into Vault, then converge. The only things that suppress a file
+# their registration is stored in AWS Secrets Manager, then converge. The only things that suppress a file
 # are GITOPS_OWNS_CERT_MANAGER (environmental: don't install cert-manager if the cluster has it)
 # and SHARED_CLUSTER_SKIP (low-level override).
 
@@ -44,6 +53,15 @@ def load_env(path):
     return env
 
 def strip_conditionals(text, env):
+    # Attachment transition mode: file storage, S3 with the legacy PVC retained,
+    # or final S3-only operation. On Manage 8.7.24 the S3 runtime properties are
+    # configured separately; these modes control the PVC and imported CA resources.
+    text = IF_IN.sub(
+        lambda m: m.group(3) + "\n" if env.get(m.group(1), "").strip() in m.group(2).split(",") else "",
+        text,
+    )
+    # {{IF_SET VAR}} keeps its body only when VAR has a non-empty value (opt-in when passed).
+    text = IF_SET.sub(lambda m: m.group(2) + "\n" if env.get(m.group(1), "").strip() else "", text)
     # {{IF_TRUE VAR}} keeps its body only when VAR is truthy; {{IF_FALSE VAR}} only when it is NOT.
     text = IF_TRUE.sub(lambda m: m.group(2) + "\n" if truthy(env.get(m.group(1), "")) else "", text)
     return IF_FALSE.sub(lambda m: "" if truthy(env.get(m.group(1), "")) else m.group(2) + "\n", text)
@@ -81,6 +99,10 @@ def render_one(name):
     envfile = os.path.join(HERE, "envs", f"{name}.env")
     if not os.path.exists(envfile): sys.exit(f"no env file: {envfile}")
     env = load_env(envfile); cid, iid = env["CLUSTER_ID"], env["INSTANCE_ID"]
+    attachment_provider = env.get("MANAGE_ATTACHMENT_PROVIDER", "").strip()
+    if attachment_provider and attachment_provider not in ATTACHMENT_PROVIDERS:
+        supported = ", ".join(sorted(ATTACHMENT_PROVIDERS))
+        sys.exit(f"ERROR: {envfile}: MANAGE_ATTACHMENT_PROVIDER must be one of: {supported}")
     # Top-level output dir is the ACCOUNT_ID, not a literal "mas". Per-env accounts
     # (e.g. roc4, doc4) render under their own account dir so each cluster's ArgoCD
     # Account Root App globs only its own subtree ("<account>/*/..."). account=mas
@@ -110,7 +132,7 @@ def render_one(name):
               render(open(os.path.join(HERE, "base", "instance", tpl)).read(), env, tpl))
     all_skipped = skipped
     note = f"  (skipped {', '.join(all_skipped)})" if all_skipped else ""
-    print(f"Rendered {name} -> {acct}/{cid}/{note}  (secret values remain in Vault)")
+    print(f"Rendered {name} -> {acct}/{cid}/{note}  (secret values remain in AWS Secrets Manager)")
 
 def main():
     if len(sys.argv) != 2: sys.exit("usage: python3 render.py <cluster>|--all")

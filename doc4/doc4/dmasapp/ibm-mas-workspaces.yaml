@@ -1,0 +1,5 @@
+merge-key: "doc4/doc4/dmasapp"
+
+ibm_mas_workspaces:
+  - mas_workspace_id: dmaswks
+    mas_workspace_name: "dmaswks"

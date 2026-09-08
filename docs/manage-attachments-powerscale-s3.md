@@ -1,177 +1,220 @@
-# Manage attachments on PowerScale (OneFS) S3
+# Manage 8.7.24 attachments on PowerScale S3
 
-Configure Maximo Manage "attached documents" (doclinks) to store files in Dell
-PowerScale (OneFS) S3 instead of a `/DOCLINKS` PVC or NFS share, for the
-`drroc4` / `drgitopsapp` instance.
+This is the source of truth for migrating Maximo Manage 8.7.24 attachments from
+PowerScale NFS to PowerScale S3. PowerScale provisioning is documented in
+[PowerScale S3 setup](./powerscale-s3-onefs-setup.md).
 
-## What this is (and is NOT)
+## Supported configuration for 8.7.24
 
-- Manage attachments on S3 are driven by **Maximo system properties**
-  (`mxe.cos*`) stored in the Manage database (`MAXPROPVALUE`). They are **not** a
-  MAS custom resource, so **GitOps cannot own them declaratively** — this is an
-  imperative step, like the SLS/DRO registration harvest.
-- The MAS **`ObjectStorageCfg` / `coscfgs` CR** (the `130-ibm-objectstorage-config`
-  chart) is the MAS **platform** object-storage config used by other MAS apps. It
-  does **not** configure Manage attachments. Do not wire it up for this.
-- PowerScale OneFS S3 is just an S3-compatible endpoint (HTTPS on **port 9021**
-  by default), so Manage's `COSAttachmentStorage` provider talks to it the same
-  way it talks to AWS/IBM COS — you point `mxe.cosendpointuri` at PowerScale.
-- IBM's `suite_manage_attachments_config` Ansible role does not provide a clean
-  custom PowerScale endpoint path for this design, so the Manage properties are
-  applied manually and tested before migration.
+IBM GitOps 8.4.2 passes `mas_appws_spec` directly into the `ManageWorkspace`
+custom resource. It does not translate attachment settings into Maximo system
+properties.
 
-## The properties
+The installed CRD accepts
+`spec.settings.db.attachmentProvider.s3.providerCredentials.s3Url`, but on the
+tested Manage 8.7.24 deployment the operator did not materialize that block into
+the server bundles. A successful `ManageWorkspace` reconciliation therefore does
+not prove that S3 attachment storage is active.
 
-| Property | Value | Notes |
-|---|---|---|
-| `mxe.attachmentstorage` | `com.ibm.tivoli.maximo.oslc.provider.COSAttachmentStorage` | selects the S3/COS provider |
-| `mxe.cosendpointuri` | `https://bhm-pwrsclnfs.lac1.biz:9021` | PowerScale SmartConnect zone / VIP (resolves to 10.1.108.198) |
-| `mxe.cosbucketname` | `dr-maximo-bckt` | pre-created bucket |
-| `mxe.cosaccesskey` | *(from Vault)* | **encrypted property** — set via UI/API, not raw SQL |
-| `mxe.cossecretkey` | *(from Vault)* | **encrypted property** — set via UI/API, not raw SQL |
-| `mxe.doclink.securedAttachment` | `true` | **REQUIRED** — S3 attachments only work when true |
+For Manage 8.7.24, configure S3 with the nine IBM-documented Maximo system
+properties. The GitOps template deliberately does not render the nonfunctional
+S3 `attachmentProvider` block or the related Kubernetes Secret.
 
-## Procedure
+## GitOps modes
 
-### 1. PowerScale (OneFS) side
-- Enable S3 (off by default): `isi s3 settings global modify --enabled true`
-  (HTTPS/9021; HTTP/9020 stays disabled).
-- Create the bucket (`dr-maximo-bckt`).
-- Generate an S3 access key + secret for the bucket owner:
-  `isi s3 keys create --user <owner>`.
-- Export the CA cert that the S3 endpoint presents on :9021 (almost certainly an
-  internal / OneFS self-signed CA — you need it for step 4).
+Set one mode in the target environment file:
 
-### 2. Store the handoff values in Vault
-
-Using the Vault UI, create `secret/mas/drroc4/drgitopsapp/manage-cos` with:
-
-| Field | Value |
+| `MANAGE_ATTACHMENT_PROVIDER` | GitOps behavior |
 |---|---|
-| `endpoint` | `https://bhm-pwrsclnfs.lac1.biz:9021` |
-| `bucket` | `dr-maximo-bckt` |
-| `access_key` | OneFS S3 access key |
-| `secret_key` | OneFS S3 secret key |
-| `ca.crt` | Raw endpoint CA PEM |
+| `filestorage` | Configure the file provider and mount `/doclinks` |
+| `s3-migration` | Import PowerScale CAs and keep `/doclinks` mounted |
+| `s3` | Import PowerScale CAs without mounting the legacy `/doclinks` PVC |
 
-This path is a secure operator handoff; no chart reads it automatically.
+The filesystem modes also support:
 
-### 3. Preflight
-
-From a running Manage server-bundle pod, open a TLS session to the PowerScale endpoint:
-
-```bash
-oc exec -n mas-drgitopsapp-manage <server-bundle-pod> -- bash -c \
-  "echo | openssl s_client -connect bhm-pwrsclnfs.lac1.biz:9021 \
-  -servername dr-maximo-bckt.bhm-pwrsclnfs.lac1.biz 2>/dev/null | grep -i 'verify return code'"
+```text
+MANAGE_DOCLINKS_PATH=/doclinks
+MANAGE_DOCLINKS_SIZE=100Gi
 ```
 
-The expected result is `0 (ok)`.
+Use `s3-migration` until conversion, validation, and the rollback window are
+complete. Changing to `s3` removes the mount from the Manage pod specification;
+it does not delete the PVC or its data.
 
-### 4. Certificate trust — the most-missed step
-Because :9021 is HTTPS with an internal CA, the Manage Liberty JVM must **trust
-the PowerScale S3 CA** or every attachment call fails with a TLS handshake error
-(the preflight in step 3 detects this). There is **no verified declarative
-`certificates:` field on the `ManageWorkspace` CR** for an arbitrary external CA
-in the 8.7.x line — do not add one blind. Use one of:
-- Have OneFS present a cert signed by an internal CA that Manage already trusts
-  (e.g. your Spire chain), if feasible; **or**
-- Add the OneFS S3 CA to the Manage truststore via the mechanism supported by
-  your exact MAS Manage build — **verify the field/secret against your
-  `manageworkspaces.apps.mas.ibm.com` CRD before applying**
-  (`oc explain manageworkspace.spec.settings --recursive | grep -i cert`).
-Re-run step 3 until it reports **PASS**.
+## AWS Secrets Manager contract
 
-### 5. Apply the properties (encryption-safe)
-`mxe.cosaccesskey` / `mxe.cossecretkey` are **encrypted** properties — a raw SQL
-`UPDATE` writes plaintext that Maximo cannot decrypt. Set them via a path that
-encrypts on write:
-- **Manage admin UI** (recommended): System Configuration → Platform
-  Configuration → System Properties → set each value → **Live Refresh**. Take the
-  key values from Vault `secret/mas/drroc4/drgitopsapp/manage-cos`.
-- **Maximo REST API**: same properties + a live refresh, using the superuser
-  credential from the operator-generated secret `drgitopsapp-credentials-superuser`
-  in the `mas-drgitopsapp-core` namespace.
-- Set the non-encrypted properties through the same Manage UI and perform a Live Refresh.
+Keep the PowerScale values at:
 
-### 6. Verify
-Create an attachment on any record; confirm the object appears in the
-`drgitopsapp-attachments` bucket on PowerScale. Existing filesystem attachments
-are **not** migrated automatically — plan a separate copy/migration if needed.
+```text
+mas/<account>/<cluster>/<instance>/manage-cos
+```
 
-## Gotchas
+| JSON field | Use |
+|---|---|
+| `endpoint` | `mxe.cosendpointuri` |
+| `bucket` | `mxe.cosbucketname` |
+| `access_key` | `mxe.cosaccesskey` |
+| `secret_key` | `mxe.cossecretkey` |
+| `powerscale_s3_subca` | Manage imported certificate |
+| `powerscale_s3_rootca` | Manage imported certificate |
 
-- **Path-style vs virtual-hosted addressing.** On-prem S3 usually needs
-  **path-style** (`endpoint/bucket/key`); virtual-hosted style
-  (`bucket.endpoint`) needs wildcard DNS that SmartConnect typically lacks.
-  Confirm OneFS is configured for path-style (or DNS supports virtual-hosted) and
-  that your Manage build's COS client honours it. This is the most likely thing
-  to bite during step 6.
-- **`securedAttachment` must be `true`** or the S3 provider is bypassed.
-- **`global_secrets` will NOT carry these.** The Manage operator only maps a
-  whitelisted set of `MXE_*` env vars (the crypto keys) into system properties;
-  arbitrary `mxe.cos*` env vars are not applied, and camelCase
-  `mxe.doclink.securedAttachment` can't be represented as an uppercase env var.
-  Use MAXPROPVALUE / UI / API, not `global_secrets`.
-- **Version check.** Confirm the exact property list for the Manage 8.7.x channel
-  in IBM docs before applying — property names have been stable but verify.
+The Argo CD secret plugin resolves only the two CA certificates into
+`settings.deployment.importedCerts`. Enter the four S3 connection values from the
+approved AWS secret through the Manage UI or API. Do not commit them to Git or
+place them in `bundleLevelProperties`.
 
-## Resolved issues — the three things that blocked attachments (CONFIRMED, drroc4)
+## Required Manage properties
 
-Manage attachments to PowerScale S3 failed through **three distinct layers**, each with a
-different error. All three are now fixed. Diagnose in this order if it breaks again — the
-symptom changes as you fix each layer.
+In Manage, open **System Configuration > Platform Configuration > System
+Properties**. Set the global values below and save them. Use the Manage UI or API
+for the credential properties so Maximo handles their encrypted values; do not
+update them with raw SQL.
 
-### 1. TLS — cert did not cover the virtual-hosted hostname
-- **Symptom:** TLS/cert error naming `dr-maximo-bckt.bhm-pwrsclnfs.lac1.biz`.
-- **Why:** the AWS SDK uses **virtual-hosted style** (`<bucket>.<endpoint>`), so it connects to
-  `dr-maximo-bckt.bhm-pwrsclnfs.lac1.biz` — which the OneFS cert didn't cover.
-- **Fix:** add a **`*.bhm-pwrsclnfs.lac1.biz`** SAN to the OneFS S3 cert.
-- **Verify:** `echo | openssl s_client -connect bhm-pwrsclnfs.lac1.biz:9021 -servername bhm-pwrsclnfs.lac1.biz 2>/dev/null | openssl x509 -noout -ext subjectAltName` → shows `DNS:*.bhm-pwrsclnfs.lac1.biz`.
+| Property | Value |
+|---|---|
+| `mxe.attachmentstorage` | `com.ibm.tivoli.maximo.oslc.provider.COSAttachmentStorage` |
+| `mxe.cosendpointuri` | PowerScale HTTPS S3 endpoint, including port `9021` |
+| `mxe.cosbucketname` | PowerScale bucket name |
+| `mxe.cosaccesskey` | PowerScale access key |
+| `mxe.cossecretkey` | PowerScale secret key |
+| `mxe.doclink.securedAttachment` | `true` |
+| `mxe.doclink.doctypes.defpath` | `cos:doclinks/default` |
+| `mxe.doclink.doctypes.topLevelPaths` | `cos:doclinks` |
+| `mxe.doclink.path01` | `cos:doclinks=https://<manage-ui-route>/maximo/oslc/cosdoclink` |
 
-### 2. S3 addressing — OneFS rejected virtual-hosted requests → `InvalidBucketName`
-- **Symptom:** `AmazonS3Exception: The specified bucket is not valid (InvalidBucketName; 400)`.
-  Manage stack ends in `COSApi.uploadFile` → `AmazonS3Client.putObject`.
-- **Why:** AWS SDK v1 defaults to **virtual-hosted style** for DNS-valid bucket names and has
-  **no property/env toggle** for path-style (code-only `withPathStyleAccessEnabled`). OneFS only
-  accepts virtual-hosted requests when the S3 **base domain** is configured; it wasn't, so it
-  couldn't map the hostname subdomain to a bucket. (s3cmd worked only because `.s3cfg` had
-  `host_bucket` **without** `%(bucket)s`, forcing path-style — a different mode than Manage.)
-- **Reproduce with s3cmd (virtual-hosted PUT = what Manage does):**
-  ```
-  s3cmd put /tmp/x s3://dr-maximo-bckt/x --host=bhm-pwrsclnfs.lac1.biz:9021 \
-    --host-bucket='%(bucket)s.bhm-pwrsclnfs.lac1.biz:9021' --ca-certs=/etc/pki/ca-trust/source/anchors/spire-chain.cer
-  ```
-- **Fix (OneFS, per Dell OneFS S3 API Guide H18293):**
-  ```
-  isi network groupnets modify <groupnet> --allow-wildcard-subdomains=true
-  isi s3 settings zone modify --zone=<zone> --base-domain=bhm-pwrsclnfs.lac1.biz
-  ```
-  Needs wildcard DNS `*.bhm-pwrsclnfs.lac1.biz → 10.1.108.198` (already present) and the SAN from #1.
-  Find the groupnet via `isi network pools list` (SC DNS name = `bhm-pwrsclnfs.lac1.biz`; pool ID = `groupnet.subnet.pool`).
+If converted objects keep nested directory names, also test whether the 8.7.24
+environment requires `mxe.cosnestedfile=1` before using it in production.
 
-### 3. Data integrity — OneFS non-MD5 ETag → `Unable to verify integrity of data upload`
-- **Symptom:** SDK error `Unable to verify integrity of data upload. Client calculated content
-  hash (contentMD5 …) didn't match hash (etag: 000000010b61…) calculated by Amazon S3`.
-  **The object lands in the bucket at full size, but Manage rolls back the doclink** (you get
-  `BMXAA2322E - Cannot clear the filter until record is saved`), so the attachment isn't
-  registered and each attempt orphans an object.
-- **Why:** OneFS by default does **not** compute MD5 ETags — it returns an opaque string. The AWS
-  SDK verifies uploads by comparing its MD5 to the returned ETag → mismatch → throws.
-- **Fix (OneFS, preferred — keeps integrity checking):**
-  ```
-  isi s3 settings zone modify --zone=<zone> --use-md5-for-etag=true
-  ```
-  (per-zone; disabled by default; OneFS 9.4+. Optional companion `--validate-content-md5=true`.)
-- **Fallback (Manage/SDK — no storage change):** JVM option on the server bundles
-  `-Dcom.amazonaws.services.s3.disablePutObjectMD5Validation=true` (add `disableGetObjectMD5Validation=true`
-  for reads). Skips the client check; you lose upload integrity verification.
+Restart every Manage server bundle after saving the properties unless each
+property is confirmed to support Live Refresh.
 
-**References:** Dell OneFS S3 API Guide (H18293); Dell OneFS Web Admin Guide "ETag"
-(`use-md5-for-etag` / `validate-content-md5`); AWS SDK for Java v1 `SkipMd5CheckStrategy`.
+## Deployment procedure
 
-## Records for this change
+### 1. Prepare and baseline
 
-- This document contains the endpoint, bucket, properties, and confirmed fixes.
-- Vault contains the credential handoff at `secret/mas/drroc4/drgitopsapp/manage-cos`.
-- The migration and acceptance evidence must be attached to the implementation ticket.
+1. Complete the [PowerScale S3 setup](./powerscale-s3-onefs-setup.md).
+2. Confirm all six AWS secret fields exist.
+3. Create a known set of NFS-backed test attachments and record their database
+   IDs, record types, filenames, sizes, and checksums.
+4. Take a coordinated database backup and `/doclinks` snapshot.
+
+### 2. Retain NFS and import the S3 CA chain
+
+Set and render:
+
+```text
+MANAGE_ATTACHMENT_PROVIDER=s3-migration
+```
+
+Commit the rendered configuration and let Argo CD synchronize it. Verify that
+the legacy PVC remains mounted and the CA entries are present:
+
+```bash
+export INSTANCE_ID=drgitopsapp
+export WORKSPACE_ID=drgitopswks
+export MANAGE_NS=mas-${INSTANCE_ID}-manage
+export MANAGEWORKSPACE=${INSTANCE_ID}-${WORKSPACE_ID}
+
+oc get manageworkspace "$MANAGEWORKSPACE" -n "$MANAGE_NS" \
+  -o jsonpath='{.spec.settings.deployment.importedCerts[*].alias}{"\n"}'
+
+oc get manageworkspace "$MANAGEWORKSPACE" -n "$MANAGE_NS" \
+  -o jsonpath='{range .spec.settings.deployment.persistentVolumes[*]}{.pvcName}{" -> "}{.mountPath}{"\n"}{end}'
+```
+
+### 3. Configure and verify the runtime properties
+
+Set the nine properties in Manage, restart all server bundles, then verify the
+stored non-secret values in Oracle:
+
+```sql
+SELECT propname,
+       CASE
+         WHEN LOWER(propname) IN ('mxe.cosaccesskey', 'mxe.cossecretkey')
+           THEN CASE WHEN propvalue IS NULL THEN '<missing>' ELSE '<configured>' END
+         ELSE propvalue
+       END AS propvalue,
+       servername
+FROM maximo.maxpropvalue
+WHERE LOWER(propname) IN (
+  'mxe.attachmentstorage',
+  'mxe.cosendpointuri',
+  'mxe.cosbucketname',
+  'mxe.cosaccesskey',
+  'mxe.cossecretkey',
+  'mxe.doclink.securedattachment',
+  'mxe.doclink.doctypes.defpath',
+  'mxe.doclink.doctypes.toplevelpaths',
+  'mxe.doclink.path01'
+)
+ORDER BY propname, servername;
+```
+
+Also confirm the S3 endpoint is trusted from a running Manage server-bundle pod:
+
+```bash
+export MANAGE_POD=<ui-or-cron-server-bundle-pod>
+oc exec -n "$MANAGE_NS" "$MANAGE_POD" -- bash -c \
+  "echo | openssl s_client -connect bhm-pwrsclnfs.lac1.biz:9021 \
+  -servername dr-maximo-bckt.bhm-pwrsclnfs.lac1.biz 2>/dev/null \
+  | grep -i 'verify return code'"
+```
+
+Expected TLS result: `0 (ok)`.
+
+### 4. Migrate and validate
+
+Use IBM's supported `file2s3.sh` conversion tool from a Manage admin or maxinst
+pod that can still access `/doclinks`. Copying files directly into the bucket is
+not sufficient because the database metadata and S3 object keys must agree.
+
+After conversion:
+
+1. Compare source file count and total size with the converted object set.
+2. Compare checksums for the recorded test files.
+3. Open migrated attachments from Work Orders, Assets, and Locations.
+4. Upload, download, and delete new S3-backed attachments.
+5. Review all server-bundle logs for S3, TLS, integrity, and authorization errors.
+
+### 5. Complete the migration
+
+After acceptance and the rollback window, set:
+
+```text
+MANAGE_ATTACHMENT_PROVIDER=s3
+```
+
+Render, commit, and synchronize. Confirm `/doclinks` is no longer mounted before
+scheduling the old PVC for separate retention and removal. Do not delete the NFS
+data in the same change that removes the mount.
+
+## Verify the nonfunctional 8.7.24 CR field is absent
+
+The following command prints the stored `s3Url` only when the block that is
+nonfunctional in this 8.7.24 deployment is still present:
+
+```bash
+oc get manageworkspace "$MANAGEWORKSPACE" -n "$MANAGE_NS" \
+  -o jsonpath='{.spec.settings.db.attachmentProvider.s3.providerCredentials.s3Url}{"\n"}'
+```
+
+After the corrected GitOps manifest synchronizes, this command should print a
+blank line for S3 modes. For file storage, `attachmentProvider.filestorage`
+remains valid.
+
+To inspect what the installed CRD accepts:
+
+```bash
+oc explain manageworkspace.spec.settings.db.attachmentProvider.s3.providerCredentials \
+  --api-version=apps.mas.ibm.com/v1
+```
+
+Schema acceptance alone is not runtime verification. Confirm the nine system
+properties and complete an upload/download test.
+
+## References
+
+- [IBM: S3 attachment properties](https://www.ibm.com/docs/en/masv-and-l/maximo-manage/cd?topic=properties-attachment-s3)
+- [IBM: Convert file-based storage to S3](https://www.ibm.com/docs/en/masv-and-l/maximo-manage/cd?topic=storage-converting-file-based-s3)
+- [IBM MAS DevOps: Manage attachment configuration](https://ibm-mas.github.io/ansible-devops/roles/suite_manage_attachments_config/)
+- [PowerScale S3 setup](./powerscale-s3-onefs-setup.md)

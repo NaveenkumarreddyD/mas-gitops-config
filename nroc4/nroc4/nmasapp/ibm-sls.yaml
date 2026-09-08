@@ -3,17 +3,19 @@ merge-key: "nroc4/nroc4/nmasapp"
 ibm_sls:
   sls_channel: "3.x"
   sls_install_plan: Automatic
-  sls_entitlement_file: "<path:secret/data/nroc4/nroc4/nmasapp/license#license_file>"
-  ibm_entitlement_key: "<path:secret/data/nroc4/nroc4/entitlement#image_pull_secret_b64>"
+  sls_entitlement_file: "<path:mas/nroc4/nroc4/nmasapp/license#license_file>"
+  ibm_entitlement_key: "<path:mas/nroc4/nroc4/entitlement#image_pull_secret_b64>"
   icr_cp_open: "icr.io/cpopen"
+  # IBM's native postsync-update-sm job publishes SLS to AWS Secrets Manager. This is the
+  # INSTANCE-level SLS chart (ibm-sls), whose job writes <account>/<cluster>/<instance>/sls
+  # with fields registration_key / ca_b64. Publisher key comes from the sm.* block in
+  # ibm-mas-instance-base.yaml (same merge-key). application_admin_role is required by the job.
   run_sync_hooks: true
-  vault_addr: "http://vault-active.vault.svc.cluster.local:8200"
-  vault_writer_role: "mas-gitops-writer"
-  vault_kv_mount: "secret"
+  application_admin_role: true
 
   mongodb_provider: community
-  sls_mongo_username: "<path:secret/data/nroc4/nroc4/nmasapp/sls-mongo#username>"
-  sls_mongo_password: "<path:secret/data/nroc4/nroc4/nmasapp/sls-mongo#password>"
+  sls_mongo_username: "<path:mas/nroc4/nroc4/nmasapp/sls-mongo#username>"
+  sls_mongo_password: "<path:mas/nroc4/nroc4/nmasapp/sls-mongo#password>"
   sls_mongo_secret_name: sls-mongo-credentials
 
   mongo_spec:
@@ -22,9 +24,9 @@ ibm_sls:
     secretName: sls-mongo-credentials
     retryWrites: false
     nodes:
-      - host: "<path:secret/data/nroc4/nroc4/nmasapp/mongo#host>"
+      - host: "<path:mas/nroc4/nroc4/nmasapp/mongo#host>"
         port: 27017
     certificates:
       # SLS trusts the same Mongo CA used by the MAS MongoCfg.
       - alias: mongoca
-        crt: "<path:secret/data/nroc4/nroc4/nmasapp/mongo#ca.crt>"
+        crt: "<path:mas/nroc4/nroc4/nmasapp/mongo#ca.crt>"

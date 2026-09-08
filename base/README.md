@@ -1,44 +1,42 @@
-# `base/` template contract
+# Template contract
 
-Templates here are rendered by `render.py` (`${VAR}` required, `${VAR:-default}` optional) into
-`<account>/<cluster>/<instance>/...` and read by ArgoCD. Templates are kept **comment-free**; the non-obvious rules
-that, if broken, cause **silent failures** are recorded here instead.
+`render.py` combines `base/*.tpl` with `envs/<cluster>.env` and writes the committed
+IBM configuration under `<account>/<cluster>/<instance>`.
 
-## AVP secret references — do not treat `#` as a comment
-Lines like `"<path:secret/data/<acct>/<cluster>/<inst>/manage-crypto#cryptoKey>"` use `#` as the
-**key separator inside the secret reference**. It is part of the value, not a comment. Never strip
-`#` from `<path:...>` lines (any comment-removal tooling must skip lines containing `<path:`).
+Secret values never belong in this repository. A value such as
+`<path:mas/<account>/<cluster>/<instance>/jdbc-system#password>` is resolved from AWS
+Secrets Manager by Argo CD. The `#` separates the JSON field from the secret name and
+must not be stripped as a YAML comment.
 
-## ManageWorkspace (`ibm-mas-masapp-configs.yaml.tpl`)
-- **`serverBundles` and `persistentVolumes` MUST be nested under `settings.deployment`.** The
-  ManageWorkspace CRD only reads them there. Placed one level up (under `settings`) they are
-  **silently dropped** — the operator then defaults to **AIO (a single `all` server)** and creates
-  **no PVCs**. Symptom: "no ui/cron/mea pods, no PVCs."
-- **Split bundles require `settings.aio.install: false`.** With AIO on (or no serverBundles), all
-  bundles collapse into one `all` server.
-- **Designate targets explicitly in split mode** (AIO did this automatically on the `all` server):
-  - `isUserSyncTarget: true` — must be on an `all` or `mea` bundle (else the vmanage webhook denies:
-    "at least one server bundle with bundle type all or mea must be selected to synchronize users").
-  - `isMobileTarget: true` — the bundle Maximo Mobile connects to (we use the `ui` bundle).
-- **Components use `version: latest`** (`base`/`utilities`/`spatial`). The operator resolves each to
-  the version shipped in the pinned catalog. Do NOT pin an add-on to the Manage version number
-  (e.g. Spatial `8.7.24` is not a real Spatial release → webhook rejection). NOTE: with `base: latest`
-  a catalog bump will let Manage follow the new version and run a maxinst schema upgrade — control
-  that via the catalog tag + a DB backup, not a base pin.
-- **`autoGenerateEncryptionKeys` is `${MANAGE_AUTO_GENERATE_ENCRYPTION_KEYS}`** (env-controlled).
-  Reused DB / prod → set `false` and provide the original keys (`ALLOW_CUSTOM_MANAGE_CRYPTO_KEYS=true`).
-  Fresh DB → `true`. After install, `scripts/backup-manage-secrets.sh` backs up the live crypto keys +
-  admin superuser into Vault for reproducibility.
-- **Attachments use external storage** → no `/DOCLINKS` PVC. Only `jmsstore` (JMS persistence) and
-  `globaldir` (shared dir) need local RWX volumes. If you switch to a mounted external share for
-  attachments, add a `persistentVolumes` entry pointing at it.
+## ManageWorkspace rules
 
-## Per-env overrides (no env-file bloat)
-Use `${VAR:-default}` so the template carries a default and an env sets the var only to override:
-- `MANAGE_JMSSTORE_SIZE` / `MANAGE_GLOBALDIR_SIZE` — PVC sizes (default `20Gi`). PVCs can grow
-  (StorageClass must allow expansion) but **cannot shrink**.
+- `serverBundles` and `persistentVolumes` must be nested under
+  `settings.deployment`. Other locations are silently ignored by the CRD.
+- Split bundles require `settings.aio.install: false`.
+- Split mode needs an explicit `isUserSyncTarget` on an `all` or `mea` bundle and an
+  explicit `isMobileTarget` on the mobile-facing bundle.
+- Component `version: latest` means the version supplied by the pinned Manage catalog,
+  not an unrestricted image upgrade. Control upgrades with the catalog pin and a database
+  backup.
+- A fresh database may use `MANAGE_AUTO_GENERATE_ENCRYPTION_KEYS=true`. A reused database
+  must use its original keys: set the value to `false` and create the `manage-crypto`
+  AWS secret before deployment.
 
-## Admin login
-The MAS admin user is the **operator-generated** secret `${INSTANCE_ID}-credentials-superuser` in the
-core namespace. We do NOT generate a superuser; `backup-manage-secrets.sh` copies the operator's value
-into Vault `secret/<IP>/superuser` post-install.
+## Attachment storage
+
+`MANAGE_ATTACHMENT_PROVIDER` controls the rendered storage:
+
+- `filestorage`: file provider plus an RWX PVC at `/doclinks`.
+- `s3-migration`: keeps `/doclinks` and imports the PowerScale S3 CA chain.
+- `s3`: imports the CA chain without the legacy attachment PVC.
+- unset: no attachment-provider override.
+
+Manage 8.7.24 still requires the `mxe.cos*` application properties described in
+`docs/manage-attachments-powerscale-s3.md`.
+
+PVC sizes are controlled by `MANAGE_JMSSTORE_SIZE`, `MANAGE_GLOBALDIR_SIZE`, and
+`MANAGE_DOCLINKS_SIZE`. PVCs may be expanded when the storage class allows it; they
+cannot be shrunk.
+
+Run `./render.sh <cluster>` after every environment change and review both the template
+and generated-file diff before commit.
