@@ -13,7 +13,7 @@ drroc4/                          # account (= clusterId)
     ibm-mas-cluster-base.yaml    # cluster-scoped config
     ibm-operator-catalog.yaml
     ibm-dro.yaml
-    drrocapp/                    # instance
+    drgitopsapp/                 # instance
       ibm-mas-instance-base.yaml
       ibm-sls.yaml
       ibm-mas-suite.yaml
