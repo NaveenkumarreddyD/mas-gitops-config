@@ -46,7 +46,7 @@ it does not delete the PVC or its data.
 Keep the PowerScale values at:
 
 ```text
-mas/<account>/<cluster>/<instance>/manage-cos
+<account>/<cluster>/<instance>/manage-cos
 ```
 
 | JSON field | Use |

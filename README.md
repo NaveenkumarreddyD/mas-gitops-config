@@ -43,8 +43,8 @@ Secrets are references only: the Argo CD plugin resolves
 `<path:<account>/<cluster>/...>` from AWS Secrets Manager at sync time. Never commit
 secret values or AWS credentials.
 
-The IBM 8.4.2 static-key SLS/DRO write-back Jobs are disabled in these values. The
-platform repository deploys an automatic IAM Roles Anywhere publisher for the generated
-`dro` and `sls` secrets; no operator publish step is required.
+SLS/DRO generated secrets (`dro`, `sls`) are published to AWS Secrets Manager by IBM's
+native `postsync-update-sm` jobs (`run_sync_hooks: true`), using the write-scoped `publisher`
+key; MAS reads them back (CAs via AVP's `| base64decode`). No custom publisher is involved.
 
 The end-to-end installation procedure is in the platform repository's `INSTALL.md`.
