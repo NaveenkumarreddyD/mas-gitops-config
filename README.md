@@ -40,7 +40,7 @@ IBM's account root reads:
 - `<account>/<cluster>/<instance>/*.yaml` — instance-scoped configuration.
 
 Secrets are references only: the Argo CD plugin resolves
-`<path:mas/<account>/<cluster>/...>` from AWS Secrets Manager at sync time. Never commit
+`<path:<account>/<cluster>/...>` from AWS Secrets Manager at sync time. Never commit
 secret values or AWS credentials.
 
 The IBM 8.4.2 static-key SLS/DRO write-back Jobs are disabled in these values. The

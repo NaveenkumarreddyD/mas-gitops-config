@@ -4,7 +4,7 @@
 IBM configuration under `<account>/<cluster>/<instance>`.
 
 Secret values never belong in this repository. A value such as
-`<path:mas/<account>/<cluster>/<instance>/jdbc-system#password>` is resolved from AWS
+`<path:<account>/<cluster>/<instance>/jdbc-system#password>` is resolved from AWS
 Secrets Manager by Argo CD. The `#` separates the JSON field from the secret name and
 must not be stripped as a YAML comment.
 
