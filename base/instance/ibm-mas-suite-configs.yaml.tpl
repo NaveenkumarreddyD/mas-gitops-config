@@ -1,5 +1,12 @@
 merge-key: "${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}"
 
+# CONFIRM (branch codex/ibm-native-publisher): the SLSCfg/BASCfg refs below still read the
+# custom publisher's layout (mas/<acct>/<cluster>[/<instance>]/{sls,dro}#url|api_token|ca.crt).
+# IBM's native postsync-update-sm jobs write a DIFFERENT layout:
+#   DRO -> <account>/<cluster>/dro           fields dro_url / dro_api_token / dro_ca_b64enc
+#   SLS -> <account>/<icn>/<subscription>/sls fields sls_url / registration_key / ca_b64
+# Before this branch works end-to-end, realign these refs AND resolve the 3 items in
+# platform-gitops/MIGRATION-NOTES-ibm-native-publisher.md (b64 CA, ICN+subscription_id, mas/ prefix).
 ibm_mas_suite_configs:
   - mas_config_name: "${INSTANCE_ID}-sls-system"
     mas_config_chart: ibm-mas-sls-config
