@@ -11,11 +11,12 @@ cluster:
   url: https://kubernetes.default.svc
   nonshared: ""
 
-# Required by the official IBM 8.4.2 root templates, which reference .Values.sm.*
-# unconditionally. These stay empty; the Roles Anywhere publisher handles write-back.
+# Publisher (write-scoped) static key. IBM's native postsync-update-sm jobs (DRO here,
+# cluster-level) read sm.aws_* -> sm_aws_* and use it to write generated secrets to AWS SM.
+# AVP resolves these before the chart b64-encodes them into the job's mounted Secret.
 sm:
-  aws_access_key_id: ""
-  aws_secret_access_key: ""
+  aws_access_key_id: "<path:mas/roc4/roc4/publisher#aws_access_key_id>"
+  aws_secret_access_key: "<path:mas/roc4/roc4/publisher#aws_secret_access_key>"
 
 custom_labels:
   environment: roc4

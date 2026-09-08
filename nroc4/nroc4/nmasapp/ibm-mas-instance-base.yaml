@@ -14,8 +14,8 @@ cluster:
 instance:
   id: nmasapp
 
-# Required by the official IBM 8.4.2 instance-root templates. These stay empty; the
-# Roles Anywhere publisher handles write-back.
+# Publisher (write-scoped) static key. IBM's native postsync-update-sm job for SLS
+# (instance-level) reads sm.aws_* -> sm_aws_* to write the SLS registration to AWS SM.
 sm:
-  aws_access_key_id: ""
-  aws_secret_access_key: ""
+  aws_access_key_id: "<path:mas/nroc4/nroc4/publisher#aws_access_key_id>"
+  aws_secret_access_key: "<path:mas/nroc4/nroc4/publisher#aws_secret_access_key>"

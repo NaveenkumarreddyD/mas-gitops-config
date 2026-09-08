@@ -5,11 +5,7 @@ ibm_dro:
   ibm_entitlement_key: "<path:mas/roc4/roc4/entitlement#image_pull_secret_b64>"
   dro_install_plan: Automatic
   imo_install_plan: Automatic
-  # IBM's native postsync-update-sm job publishes DRO to AWS Secrets Manager. Enabled here
-  # (the custom platform publisher was removed on branch codex/ibm-native-publisher).
+  # IBM's native postsync-update-sm job publishes DRO to AWS Secrets Manager (path
+  # <account>/<cluster>/dro). Publisher key comes from the sm.* block in
+  # ibm-mas-cluster-base.yaml (same merge-key), so it is not repeated here.
   run_sync_hooks: true
-sm:
-  # The IBM root chart reads these at render time and mounts them into the update-sm job.
-  # Publisher (write-scoped) static key, resolved by AVP before the chart b64-encodes it.
-  aws_access_key_id: "<path:mas/roc4/roc4/publisher#aws_access_key_id>"
-  aws_secret_access_key: "<path:mas/roc4/roc4/publisher#aws_secret_access_key>"

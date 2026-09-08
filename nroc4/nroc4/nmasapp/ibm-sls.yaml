@@ -6,13 +6,10 @@ ibm_sls:
   sls_entitlement_file: "<path:mas/nroc4/nroc4/nmasapp/license#license_file>"
   ibm_entitlement_key: "<path:mas/nroc4/nroc4/entitlement#image_pull_secret_b64>"
   icr_cp_open: "icr.io/cpopen"
-  # IBM's native postsync-update-sm job publishes SLS to AWS Secrets Manager. Enabled here
-  # (the custom platform publisher was removed on branch codex/ibm-native-publisher).
-  # NOTE: the SLS update-sm job ALSO requires application_admin_role: true, and reads the
-  # publisher key from sm_aws_* (set the sm.* block in ibm-mas-instance-base.yaml.tpl to
-  # <path:mas/nroc4/nroc4/publisher#...>). It writes to
-  # <account>/<ibm_customer_number>/<subscription_id>/sls with fields
-  # sls_url / registration_key / ca_b64 — see MIGRATION-NOTES-ibm-native-publisher.md (# CONFIRM).
+  # IBM's native postsync-update-sm job publishes SLS to AWS Secrets Manager. This is the
+  # INSTANCE-level SLS chart (ibm-sls), whose job writes <account>/<cluster>/<instance>/sls
+  # with fields registration_key / ca_b64. Publisher key comes from the sm.* block in
+  # ibm-mas-instance-base.yaml (same merge-key). application_admin_role is required by the job.
   run_sync_hooks: true
   application_admin_role: true
 

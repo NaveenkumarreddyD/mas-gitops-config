@@ -1,12 +1,10 @@
 merge-key: "${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}"
 
-# CONFIRM (branch codex/ibm-native-publisher): the SLSCfg/BASCfg refs below still read the
-# custom publisher's layout (mas/<acct>/<cluster>[/<instance>]/{sls,dro}#url|api_token|ca.crt).
-# IBM's native postsync-update-sm jobs write a DIFFERENT layout:
-#   DRO -> <account>/<cluster>/dro           fields dro_url / dro_api_token / dro_ca_b64enc
-#   SLS -> <account>/<icn>/<subscription>/sls fields sls_url / registration_key / ca_b64
-# Before this branch works end-to-end, realign these refs AND resolve the 3 items in
-# platform-gitops/MIGRATION-NOTES-ibm-native-publisher.md (b64 CA, ICN+subscription_id, mas/ prefix).
+# SLSCfg/BASCfg read the secrets IBM's native postsync-update-sm jobs publish (no mas/ prefix):
+#   DRO -> <account>/<cluster>/dro                 fields dro_url / dro_api_token / dro_ca_b64enc
+#   SLS -> <account>/<cluster>/<instance>/sls      fields registration_key / ca_b64
+# CAs are stored base64; AVP's "| base64decode" filter converts to PEM. SLS url is the internal
+# service DNS (IBM does not publish it to SM).
 ibm_mas_suite_configs:
   - mas_config_name: "${INSTANCE_ID}-sls-system"
     mas_config_chart: ibm-mas-sls-config
@@ -16,10 +14,11 @@ ibm_mas_suite_configs:
     mas_config_kind: "slscfgs"
     mas_config_api_version: "config.mas.ibm.com"
     use_postdelete_hooks: true
-    registration_key: "<path:mas/${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/sls#registration_key>"
-    url: "<path:mas/${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/sls#url>"
+    registration_key: "<path:${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/sls#registration_key>"
+    url: "https://sls.mas-${INSTANCE_ID}-sls.svc"
     ca:
-      crt: "<path:mas/${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/sls#ca.crt>"
+      crt: |
+        <path:${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/sls#ca_b64 | base64decode>
 
   - mas_config_name: "${INSTANCE_ID}-bas-system"
     mas_config_chart: ibm-mas-bas-config
@@ -29,14 +28,15 @@ ibm_mas_suite_configs:
     mas_config_kind: "bascfgs"
     mas_config_api_version: "config.mas.ibm.com"
     use_postdelete_hooks: true
-    dro_endpoint_url: "<path:mas/${ACCOUNT_ID}/${CLUSTER_ID}/dro#url>"
+    dro_endpoint_url: "<path:${ACCOUNT_ID}/${CLUSTER_ID}/dro#dro_url>"
     dro_contact:
       email: "${DRO_CONTACT_EMAIL}"
       first_name: "${DRO_CONTACT_FIRSTNAME}"
       last_name: "${DRO_CONTACT_LASTNAME}"
-    dro_api_token: "<path:mas/${ACCOUNT_ID}/${CLUSTER_ID}/dro#api_token>"
+    dro_api_token: "<path:${ACCOUNT_ID}/${CLUSTER_ID}/dro#dro_api_token>"
     dro_ca:
-      crt: "<path:mas/${ACCOUNT_ID}/${CLUSTER_ID}/dro#ca.crt>"
+      crt: |
+        <path:${ACCOUNT_ID}/${CLUSTER_ID}/dro#dro_ca_b64enc | base64decode>
 
   - mas_config_name: "${INSTANCE_ID}-mongo-system"
     mas_config_chart: ibm-mas-mongo-config
