@@ -46,11 +46,11 @@ ibm_mas_suite_configs:
     mas_config_kind: "mongocfgs"
     mas_config_api_version: "config.mas.ibm.com"
     use_postdelete_hooks: true
-    username: "<path:mas/${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/mongo#username>"
-    password: "<path:mas/${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/mongo#password>"
+    username: "<path:${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/mongo#username>"
+    password: "<path:${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/mongo#password>"
     config:
       hosts:
-        - host: "<path:mas/${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/mongo#host>"
+        - host: "<path:${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/mongo#host>"
           port: 27017
       configDb: admin
       authMechanism: DEFAULT
@@ -59,7 +59,7 @@ ibm_mas_suite_configs:
         secretName: "system-mongo-credentials"
     certificates:
       - alias: ca
-        crt: "<path:mas/${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/mongo#ca.crt>"
+        crt: "<path:${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/mongo#ca.crt>"
 
   - mas_config_name: "${INSTANCE_ID}-jdbc-system"
     mas_config_chart: ibm-jdbc-config
@@ -71,9 +71,9 @@ ibm_mas_suite_configs:
     use_postdelete_hooks: true
     jdbc_type: external
     jdbc_instance_name: oracle
-    jdbc_instance_username: "<path:mas/${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/jdbc-system#username>"
-    jdbc_instance_password: "<path:mas/${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/jdbc-system#password>"
-    jdbc_connection_url: "<path:mas/${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/jdbc-system#jdbc_url>"
+    jdbc_instance_username: "<path:${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/jdbc-system#username>"
+    jdbc_instance_password: "<path:${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/jdbc-system#password>"
+    jdbc_connection_url: "<path:${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/jdbc-system#jdbc_url>"
     jdbc_ssl_enabled: false
     system_suite_jdbccfg_labels:
       mas.ibm.com/configScope: system

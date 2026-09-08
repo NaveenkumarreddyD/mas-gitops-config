@@ -2,7 +2,7 @@ merge-key: "${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}"
 
 ibm_mas_suite:
   cert_manager_namespace: "cert-manager"
-  ibm_entitlement_key: "<path:mas/${ACCOUNT_ID}/${CLUSTER_ID}/entitlement#image_pull_secret_b64>"
+  ibm_entitlement_key: "<path:${ACCOUNT_ID}/${CLUSTER_ID}/entitlement#image_pull_secret_b64>"
   domain: ${MAS_DOMAIN}
   mas_channel: "${MAS_CHANNEL}"
   icr_cp: "cp.icr.io/cp"
@@ -18,7 +18,7 @@ ibm_mas_suite:
   mas_manual_cert_mgmt: ${MAS_MANUAL_CERT_MGMT:-false}
 {{IF_TRUE MAS_MANUAL_CERT_MGMT}}
   # IBM's Suite chart is the sole owner of the MAS core public certificate.
-  tls_cert: "<path:mas/${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/certs/public#tls_crt_b64>"
-  tls_key:  "<path:mas/${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/certs/public#tls_key_b64>"
-  ca_cert:  "<path:mas/${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/certs/public#ca_crt_b64>"
+  tls_cert: "<path:${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/certs/public#tls_crt_b64>"
+  tls_key:  "<path:${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/certs/public#tls_key_b64>"
+  ca_cert:  "<path:${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/certs/public#ca_crt_b64>"
 {{END_IF}}

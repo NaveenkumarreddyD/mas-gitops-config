@@ -2,7 +2,7 @@ merge-key: "roc4/roc4/rmasapp"
 
 ibm_mas_suite:
   cert_manager_namespace: "cert-manager"
-  ibm_entitlement_key: "<path:mas/roc4/roc4/entitlement#image_pull_secret_b64>"
+  ibm_entitlement_key: "<path:roc4/roc4/entitlement#image_pull_secret_b64>"
   domain: rmasapp.apps.roc4.lac1.biz
   mas_channel: "8.11.x"
   icr_cp: "cp.icr.io/cp"

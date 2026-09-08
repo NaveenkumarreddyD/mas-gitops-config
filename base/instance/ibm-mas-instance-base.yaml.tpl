@@ -17,5 +17,5 @@ instance:
 # Publisher (write-scoped) static key. IBM's native postsync-update-sm job for SLS
 # (instance-level) reads sm.aws_* -> sm_aws_* to write the SLS registration to AWS SM.
 sm:
-  aws_access_key_id: "<path:mas/${ACCOUNT_ID}/${CLUSTER_ID}/publisher#aws_access_key_id>"
-  aws_secret_access_key: "<path:mas/${ACCOUNT_ID}/${CLUSTER_ID}/publisher#aws_secret_access_key>"
+  aws_access_key_id: "<path:${ACCOUNT_ID}/${CLUSTER_ID}/publisher#aws_access_key_id>"
+  aws_secret_access_key: "<path:${ACCOUNT_ID}/${CLUSTER_ID}/publisher#aws_secret_access_key>"

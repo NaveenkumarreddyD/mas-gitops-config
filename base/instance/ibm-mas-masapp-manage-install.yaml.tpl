@@ -1,7 +1,7 @@
 merge-key: "${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}"
 
 ibm_suite_app_manage_install:
-  ibm_entitlement_key: "<path:mas/${ACCOUNT_ID}/${CLUSTER_ID}/entitlement#image_pull_secret_b64>"
+  ibm_entitlement_key: "<path:${ACCOUNT_ID}/${CLUSTER_ID}/entitlement#image_pull_secret_b64>"
   mas_app_id: manage
   mas_edition: ${MAS_EDITION}
   mas_app_namespace: mas-${INSTANCE_ID}-manage
@@ -13,7 +13,7 @@ ibm_suite_app_manage_install:
   run_sync_hooks: false
   mas_manual_cert_mgmt: true
   public_tls_secret_name: "${INSTANCE_ID}-${WORKSPACE_ID}-cert-public-81"
-  tls_cert: "<path:mas/${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/certs/public#tls_crt_b64>"
-  tls_key: "<path:mas/${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/certs/public#tls_key_b64>"
-  ca_cert: "<path:mas/${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/certs/public#ca_crt_b64>"
+  tls_cert: "<path:${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/certs/public#tls_crt_b64>"
+  tls_key: "<path:${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/certs/public#tls_key_b64>"
+  ca_cert: "<path:${ACCOUNT_ID}/${CLUSTER_ID}/${INSTANCE_ID}/certs/public#ca_crt_b64>"
   mas_app_spec: {}

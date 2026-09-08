@@ -2,7 +2,7 @@ merge-key: "doc4/doc4/dmasapp"
 
 ibm_mas_suite:
   cert_manager_namespace: "cert-manager"
-  ibm_entitlement_key: "<path:mas/doc4/doc4/entitlement#image_pull_secret_b64>"
+  ibm_entitlement_key: "<path:doc4/doc4/entitlement#image_pull_secret_b64>"
   domain: dmasapp.apps.doc4.lac1.biz
   mas_channel: "8.11.x"
   icr_cp: "cp.icr.io/cp"
