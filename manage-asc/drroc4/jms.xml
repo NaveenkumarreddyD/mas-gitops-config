@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<server description="JMS Server">
+    <!-- Enable features -->
+      <featureManager>
+        <feature>wasJmsSecurity-1.0</feature>
+        <feature>wasJmsServer-1.0</feature>
+    </featureManager>
+    <applicationManager autoExpand="true"/>
+    <wasJmsEndpoint host="*" wasJmsSSLPort="7286" wasJmsPort="7276" />
+    <messagingEngine>
+        <fileStore path="/jmsstore" fileStoreSize="16000" logFileSize="4000"/>
+        <queue id="sqoutbd" maintainStrictOrder="true" maxMessageDepth="2000000" failedDeliveryPolicy="KEEP_TRYING" maxRedeliveryCount="-1"/>
+        <queue id="sqout2bd" maintainStrictOrder="true" maxMessageDepth="2000000" failedDeliveryPolicy="KEEP_TRYING" maxRedeliveryCount="-1"/>
+        <queue id="sqoutgisbd" maintainStrictOrder="true" maxMessageDepth="2000000" failedDeliveryPolicy="KEEP_TRYING" maxRedeliveryCount="-1"/>
+        <queue id="sqinbd" maintainStrictOrder="true" maxMessageDepth="4000000" failedDeliveryPolicy="KEEP_TRYING" maxRedeliveryCount="-1"/>
+        <queue id="cqinerrbd" maxMessageDepth="4000000" failedDeliveryPolicy="KEEP_TRYING"/>
+        <queue id="cqinbd" maxMessageDepth="8000000" exceptionDestination="cqinerrbd"/>
+        <queue id="cqouterrbd" maxMessageDepth="2000000" failedDeliveryPolicy="KEEP_TRYING"/>
+        <queue id="cqoutbd" maxMessageDepth="2000000" exceptionDestination="cqouterrbd"/>
+        <queue id="notferrbd" maxMessageDepth="2000000" failedDeliveryPolicy="KEEP_TRYING"/>
+        <queue id="notfbd" maxMessageDepth="2000000" exceptionDestination="notferrbd"/>
+        <queue id="weatherbd" maxMessageDepth="2000000" failedDeliveryPolicy="KEEP_TRYING"/>
+    </messagingEngine>
+</server>

@@ -1,0 +1,23 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<server description="JMS UI CRON RPT">
+<featureManager>
+<feature>jndi-1.0</feature>
+<feature>wasJmsClient-2.0</feature>
+<feature>jmsMdb-3.2</feature>
+<feature>mdb-3.2</feature>
+</featureManager>
+<jmsQueueConnectionFactory jndiName="jms/maximo/int/cf/intcf" connectionManagerRef="mifjmsconfact"><properties.wasJms remoteServerAddress="drgitopsapp-drgitopswks-jms.mas-drgitopsapp-manage.svc:7276:BootstrapBasicMessaging"/></jmsQueueConnectionFactory>
+<connectionManager id="mifjmsconfact" maxPoolSize="20"/>
+<jmsQueue jndiName="jms/maximo/int/queues/sqout"><properties.wasJms queueName="sqoutbd"/></jmsQueue>
+<jmsQueue jndiName="jms/maximo/int/queues/sqout2"><properties.wasJms queueName="sqout2bd"/></jmsQueue>
+<jmsQueue jndiName="jms/maximo/int/queues/sqout_gis"><properties.wasJms queueName="sqoutgisbd"/></jmsQueue>
+<jmsQueue jndiName="jms/maximo/int/queues/sqin"><properties.wasJms queueName="sqinbd"/></jmsQueue>
+<jmsQueue jndiName="jms/maximo/int/queues/weather"><properties.wasJms queueName="weatherbd"/></jmsQueue>
+<jmsQueue jndiName="jms/maximo/int/queues/cqin"><properties.wasJms queueName="cqinbd"/></jmsQueue>
+<jmsQueue jndiName="jms/maximo/int/queues/cqinerr"><properties.wasJms queueName="cqinerrbd"/></jmsQueue>
+<jmsQueue jndiName="jms/maximo/int/queues/cqout"><properties.wasJms queueName="cqoutbd"/></jmsQueue>
+<jmsQueue jndiName="jms/maximo/int/queues/cqouterr"><properties.wasJms queueName="cqouterrbd"/></jmsQueue>
+<jmsQueue jndiName="jms/maximo/int/queues/notf"><properties.wasJms queueName="notfbd"/></jmsQueue>
+<jmsQueue jndiName="jms/maximo/int/queues/notferr"><properties.wasJms queueName="notferrbd"/></jmsQueue>
+<webAppSecurity refreshedAccessTokenLimit="500" />
+</server>

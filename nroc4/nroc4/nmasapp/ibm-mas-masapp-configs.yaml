@@ -46,6 +46,10 @@ ibm_mas_masapp_configs:
         db:
           dbSchema: maximo
           encryptionSecret: nmasappwks-manage-encryptionsecret
+          attachmentProvider:
+            providerSourceType: filestorage
+            filestorage:
+              defpath: /doclinks
           maxinst:
             tableSpace: MAX_DATA
             indexSpace: MAX_INDEX
@@ -69,6 +73,7 @@ ibm_mas_masapp_configs:
           persistentVolumes:
             - { pvcName: jmsstore,  mountPath: /jmsstore,  size: 20Gi,  storageClassName: isilon, accessModes: [ReadWriteMany] }
             - { pvcName: globaldir, mountPath: /globaldir, size: 20Gi, storageClassName: isilon, accessModes: [ReadWriteMany] }
+            - { pvcName: doclinks, mountPath: /doclinks, size: 100Gi, storageClassName: isilon, accessModes: [ReadWriteMany] }
           serverBundles:
             - name: ui
               bundleType: ui
