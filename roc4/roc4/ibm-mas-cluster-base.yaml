@@ -4,7 +4,7 @@ account:
   id: roc4
 
 region:
-  id: lac1
+  id: us-east-1
 
 cluster:
   id: roc4
