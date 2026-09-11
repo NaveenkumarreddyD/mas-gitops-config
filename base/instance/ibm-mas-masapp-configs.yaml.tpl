@@ -101,7 +101,9 @@ ibm_mas_masapp_configs:
 {{END_IF}}
           persistentVolumes:
             - { pvcName: jmsstore,  mountPath: /jmsstore,  size: ${MANAGE_JMSSTORE_SIZE:-20Gi},  storageClassName: ${RWX_STORAGE_CLASS}, accessModes: [ReadWriteMany] }
-            - { pvcName: globaldir, mountPath: /globaldir, size: ${MANAGE_GLOBALDIR_SIZE:-20Gi}, storageClassName: ${RWX_STORAGE_CLASS}, accessModes: [ReadWriteMany] }
+            # mountPath MUST be /max_share: Manage's mxe.int.globaldir defaults to /max_share/intGlobalDir.
+            # Mounting elsewhere (e.g. /globaldir) leaves that path unbacked -> graphite UI 404s (manage-shell not found).
+            - { pvcName: globaldir, mountPath: /max_share, size: ${MANAGE_GLOBALDIR_SIZE:-20Gi}, storageClassName: ${RWX_STORAGE_CLASS}, accessModes: [ReadWriteMany] }
 {{IF_IN MANAGE_ATTACHMENT_PROVIDER filestorage,s3-migration}}
             - { pvcName: doclinks, mountPath: ${MANAGE_DOCLINKS_PATH:-/doclinks}, size: ${MANAGE_DOCLINKS_SIZE:-100Gi}, storageClassName: ${RWX_STORAGE_CLASS}, accessModes: [ReadWriteMany] }
 {{END_IF}}

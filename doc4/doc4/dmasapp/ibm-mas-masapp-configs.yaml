@@ -70,7 +70,9 @@ ibm_mas_masapp_configs:
           serverTimezone: America/Chicago
           persistentVolumes:
             - { pvcName: jmsstore,  mountPath: /jmsstore,  size: 20Gi,  storageClassName: isilon, accessModes: [ReadWriteMany] }
-            - { pvcName: globaldir, mountPath: /globaldir, size: 20Gi, storageClassName: isilon, accessModes: [ReadWriteMany] }
+            # mountPath MUST be /max_share: Manage's mxe.int.globaldir defaults to /max_share/intGlobalDir.
+            # Mounting elsewhere (e.g. /globaldir) leaves that path unbacked -> graphite UI 404s (manage-shell not found).
+            - { pvcName: globaldir, mountPath: /max_share, size: 20Gi, storageClassName: isilon, accessModes: [ReadWriteMany] }
           serverBundles:
             - name: ui
               bundleType: ui
